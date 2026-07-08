@@ -79,10 +79,6 @@
         <div class="admin-field">
           <span class="admin-field-label">المتن</span>
           <AdminBlockEditor v-model="form.body" />
-          <details class="admin-debug">
-            <summary>بنية المتن (للتشخيص)</summary>
-            <pre>{{ bodyStructure }}</pre>
-          </details>
         </div>
 
         <div class="admin-field">
@@ -176,15 +172,6 @@ const showPreview = ref(false)
 const saving = ref(false)
 const error = ref('')
 const savedMsg = ref('')
-
-// Diagnostic: shows the live block structure so heading/quote/etc. are visible.
-const bodyStructure = computed(() => (form.body || [])
-  .map((b: any, i: number) => {
-    const label = b.type === 'heading' ? `heading h${b.level ?? 2}` : b.type
-    const txt = (b.text || b.html || b.src || '').toString().replace(/<[^>]+>/g, '').slice(0, 50)
-    return `${i + 1}. [${label}] ${txt}`
-  })
-  .join('\n') || '(فارغ)')
 
 // Calendar picker → ISO (for sorting/<time>) + auto Arabic display date.
 const arDate = new Intl.DateTimeFormat('ar-EG-u-nu-arab', { day: 'numeric', month: 'long', year: 'numeric' })

@@ -30,7 +30,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const name = `${nanoid(12)}${ext}`
-  const dir = join(process.cwd(), 'public', 'uploads')
+  // Persistent dir OUTSIDE the build output, served by server/routes/uploads/.
+  // (Writing into public/ doesn't work in production — Nitro serves .output/public.)
+  const dir = join(process.cwd(), 'uploads')
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, name), file.data)
 

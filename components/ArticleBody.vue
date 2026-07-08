@@ -9,11 +9,16 @@
         v-html="richText(block)"
       />
 
-      <component
-        :is="block.level === 3 ? 'h3' : 'h2'"
+      <!-- real <h2>/<h3> elements — v-html does NOT apply on a dynamic
+           <component :is> during SSR, which rendered headings empty -->
+      <h3
+        v-else-if="block.type === 'heading' && block.level === 3"
+        class="article-heading article-heading--3"
+        v-html="richText(block)"
+      />
+      <h2
         v-else-if="block.type === 'heading'"
-        class="article-heading"
-        :class="[`article-heading--${block.level ?? 2}`]"
+        class="article-heading article-heading--2"
         v-html="richText(block)"
       />
 

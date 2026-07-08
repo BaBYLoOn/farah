@@ -104,10 +104,17 @@ function toModel(segs: Seg[]): Block[] {
   return out
 }
 
+// Seed the segments ONCE from the initial body, then let the editors own the
+// state and only emit upward. Rebuilding segments from every echoed modelValue
+// change regenerated the segment keys and remounted the rich-text editor
+// mid-edit — which is what wiped a heading's text when a second one was made.
+// (The post body is already loaded before this component renders, thanks to the
+// page's top-level `await useFetch`, so the first call has the real content.)
+let seeded = false
 watch(() => props.modelValue, (val) => {
-  if (JSON.stringify(toModel(segments.value)) !== JSON.stringify(val || [])) {
-    segments.value = fromModel(val || [])
-  }
+  if (seeded) return
+  segments.value = fromModel(val || [])
+  seeded = true
 }, { immediate: true })
 
 function commit() { emit('update:modelValue', toModel(segments.value)) }

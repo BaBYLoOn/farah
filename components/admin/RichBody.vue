@@ -5,8 +5,7 @@
       <button type="button" class="rt-tool" :class="{ 'is-active': isActive('italic') }" title="مائل" @mousedown.prevent="run(c => c.toggleItalic())"><i>I</i></button>
       <button type="button" class="rt-tool" :class="{ 'is-active': isActive('link') }" title="رابط" @mousedown.prevent="setLink">🔗</button>
       <span class="rt-sep" />
-      <button type="button" class="rt-tool rt-tool--txt" :class="{ 'is-active': isActive('heading', { level: 2 }) }" title="عنوان رئيسي" @mousedown.prevent="run(c => c.toggleHeading({ level: 2 }))">عنوان</button>
-      <button type="button" class="rt-tool rt-tool--txt" :class="{ 'is-active': isActive('heading', { level: 3 }) }" title="عنوان فرعي" @mousedown.prevent="run(c => c.toggleHeading({ level: 3 }))">فرعي</button>
+      <button type="button" class="rt-tool rt-tool--txt" :class="{ 'is-active': isActive('heading', { level: 2 }) }" title="عنوان — يجعل السطر المحدد عنوانًا كبيرًا" @mousedown.prevent="run(c => c.toggleHeading({ level: 2 }))">عنوان</button>
       <button type="button" class="rt-tool rt-tool--txt" :class="{ 'is-active': isActive('blockquote') }" title="اقتباس — لإضافة اسم القائل ابدئي السطر التالي بـ -" @mousedown.prevent="run(c => c.toggleBlockquote())">اقتباس</button>
       <span class="rt-sep" />
       <label class="rt-color" :title="`لون الخط (${penColor})`" @mousedown.prevent>
