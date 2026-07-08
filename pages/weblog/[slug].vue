@@ -39,7 +39,7 @@
 
         <ul v-if="entry.tags?.length" class="article-tags" aria-label="وسوم">
           <li v-for="tag in entry.tags" :key="tag" class="article-tag">
-            <a class="article-tag-link" href="#"><em>{{ tag }}</em></a>
+            <NuxtLink class="article-tag-link" :to="`/tag/${encodeURIComponent(tag)}`"><em>{{ tag }}</em></NuxtLink>
           </li>
         </ul>
       </header>
