@@ -17,7 +17,10 @@
     <div class="admin-body">
       <section v-for="group in groups" :key="group.kind" class="admin-section">
         <div class="admin-section-head">
-          <h2 class="admin-section-title">{{ group.label }}</h2>
+          <h2 class="admin-section-title">
+            {{ group.label }}
+            <span class="admin-section-count">{{ group.list.value.length }}</span>
+          </h2>
           <NuxtLink :to="`/admin/post/new?kind=${group.kind}`" class="admin-btn admin-btn--primary">
             + {{ group.newLabel }}
           </NuxtLink>

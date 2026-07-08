@@ -3418,3 +3418,16 @@ img { display: block; width: 100%; }
 }
 .tag-weblog-list { margin-top: 0; }
 .tag-back { position: relative; z-index: 1; text-align: center; margin-top: 3rem; }
+
+/* Admin: post-count badge next to section title */
+.admin-section-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.6rem; height: 1.6rem; padding: 0 0.5rem;
+  margin-inline-start: 0.6rem;
+  font-family: 'Cinzel', serif; font-size: 0.85rem;
+  color: var(--a-text);
+  background: var(--a-panel2);
+  border: 1px solid var(--a-line2);
+  border-radius: 999px;
+  vertical-align: middle;
+}
