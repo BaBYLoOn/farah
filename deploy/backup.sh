@@ -5,7 +5,10 @@
 #
 #   DB snapshots -> $BACKUP_ROOT/db/farah-YYYYmmdd-HHMMSS.db
 #   uploads      -> $BACKUP_ROOT/uploads/uploads-YYYYmmdd-HHMMSS.tar.gz
+#   .env config  -> $BACKUP_ROOT/config/env-YYYYmmdd-HHMMSS.env
 #
+# Together with the code on GitHub, these three are everything needed to fully
+# restore the site (code + secrets + database + uploaded media).
 # Keeps the newest $KEEP of each; older ones are deleted.
 
 set -euo pipefail
@@ -17,7 +20,8 @@ BACKUP_ROOT="/home/hal/backups/farah"
 KEEP=14
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
-mkdir -p "$BACKUP_ROOT/db" "$BACKUP_ROOT/uploads"
+mkdir -p "$BACKUP_ROOT/db" "$BACKUP_ROOT/uploads" "$BACKUP_ROOT/config"
+chmod 700 "$BACKUP_ROOT/config"  # holds secrets — keep it private
 cd "$APP_DIR"  # so node resolves @libsql/client from the project's node_modules
 
 # --- DB: consistent snapshot via VACUUM INTO (works on a live WAL db) ---
@@ -43,8 +47,18 @@ EOF
 tar -czf "$BACKUP_ROOT/uploads/uploads-$STAMP.tar.gz" -C "$APP_DIR" uploads
 echo "uploads ok: $(du -h "$BACKUP_ROOT/uploads/uploads-$STAMP.tar.gz" | cut -f1)"
 
+# --- .env: secrets/config (DB path, admin auth) — gitignored, so it is NOT on
+#     GitHub; without it a fresh clone can't boot the site ---
+if [ -f "$APP_DIR/.env" ]; then
+  cp "$APP_DIR/.env" "$BACKUP_ROOT/config/env-$STAMP.env"
+  chmod 600 "$BACKUP_ROOT/config/env-$STAMP.env"
+  echo "env ok"
+else
+  echo "no .env — skipping"
+fi
+
 # --- rotation: keep the newest $KEEP of each kind ---
-for dir in "$BACKUP_ROOT/db" "$BACKUP_ROOT/uploads"; do
+for dir in "$BACKUP_ROOT/db" "$BACKUP_ROOT/uploads" "$BACKUP_ROOT/config"; do
   ls -1t "$dir" | tail -n +$((KEEP + 1)) | while read -r old; do
     rm -f "$dir/$old"
     echo "pruned $dir/$old"

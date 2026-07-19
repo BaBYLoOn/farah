@@ -5,5 +5,11 @@ node_modules
 dist
 .env
 .DS_Store
-uploads/
-public/uploads/
+# anchor to repo root: a bare `uploads/` also matched server/routes/uploads/
+# and silently kept that route handler (code!) out of git
+/uploads/
+/public/uploads/
+
+# UAT dev-server runtime artifacts (local only)
+.uat-dev.pid
+uat-dev.log
