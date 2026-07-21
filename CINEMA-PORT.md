@@ -17,7 +17,21 @@
 > - **Verified**: synced 50 films (all posters, 49 runtime, 45 IMDb ratings), **8 dated reviews**
 >   attached; Trakt status = needs-keys (correct). UAT DB now holds her latest-50 data.
 >
-> ### ▶ NEXT — the UI (not built yet)
+> ### ✅ UI — BUILT & VERIFIED (2026-07-21)
+> - `components/CinemaArchive.vue` (Watched/Diary browser, list+grid, filters, sort) with the
+>   review features; `pages/cinema/index.vue` + `favorites.vue`; `pages/admin/cinema.vue`
+>   (Sources w/ **two uploads** + Sync + Trakt-connect card + Titles archive + edit modal w/
+>   reviews + delete); `assets/css/cinema.css` (Farah theme, scoped under `.cinema-scope`);
+>   `plugins/poster.ts`+`reveal.ts`; nav links (public `Navbar` + admin topbar);
+>   `server/api/admin/reviews/[id].delete.ts`.
+> - **"Notes" → "Reviews"** filter; each Watched title shows its **dated reviews** (crimson rule,
+>   Cormorant); a **review icon on diary rows whose film has reviews → jumps to that title's
+>   reviews in Watched** (focus view w/ "‹ All films"). Verified on screen: 8 reviewed titles,
+>   jump focuses "Schizophrenia" with its 19 Jul 2026 review.
+> - Remaining polish (optional): favourites drag-reorder panel in admin (currently favourite via
+>   the edit-modal ♥ toggle); RTL fine-tuning; wire her Trakt keys for the TV source.
+>
+> ### ▶ NEXT — the UI (done — see above)
 > 1. `components/CinemaArchive.vue` — port; **"Notes" filter → "Review"**; show a title's dated
 >    reviews in Watched; a **review icon on diary rows whose title has reviews → jumps to that
 >    title's reviews in Watched**. Theme via a `.cinema-scope` wrapper that redefines the source's

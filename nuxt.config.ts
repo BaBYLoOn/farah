@@ -47,5 +47,5 @@ export default defineNuxtConfig({
       ],
     },
   },
-  css: ['swiper/css', 'swiper/css/pagination', '~/assets/css/main.css'],
+  css: ['swiper/css', 'swiper/css/pagination', '~/assets/css/main.css', '~/assets/css/cinema.css'],
 })

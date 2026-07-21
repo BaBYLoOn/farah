@@ -7,6 +7,7 @@
           <span class="admin-brand-name">لوحة التحكم</span>
         </div>
         <div class="admin-topbar-actions">
+          <NuxtLink to="/admin/cinema" class="admin-btn admin-btn--ghost">السينما 🎬</NuxtLink>
           <NuxtLink to="/admin/site" class="admin-btn admin-btn--ghost">إعدادات الموقع</NuxtLink>
           <NuxtLink to="/" class="admin-btn admin-btn--ghost" target="_blank">عرض الموقع ↗</NuxtLink>
           <button class="admin-btn admin-btn--ghost" @click="logout">خروج</button>
