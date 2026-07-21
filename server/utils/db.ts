@@ -163,6 +163,10 @@ export async function ensureDb(): Promise<void> {
         guid TEXT UNIQUE
       )
     `)
+    // Which TMDB endpoint a tmdb_id belongs to ('movie' | 'tv'). Letterboxd logs
+    // anime/TV as ordinary "films", so `type` alone can't tell us — and looking a
+    // TV id up under /movie returns the wrong record (or 404s).
+    try { await client.execute(`ALTER TABLE titles ADD COLUMN tmdb_kind TEXT`) } catch { /* exists */ }
     // a dated note can be public (= a review, shown on the site) or private (admin only)
     try { await client.execute(`ALTER TABLE reviews ADD COLUMN private INTEGER DEFAULT 0`) } catch { /* exists */ }
     await client.execute(`CREATE INDEX IF NOT EXISTS idx_reviews_title ON reviews (title_id)`)

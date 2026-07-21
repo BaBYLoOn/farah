@@ -61,7 +61,7 @@ export async function enrichTitles(limit = 60) {
 
   const d = db()
   const rows = await d.execute({
-    sql: `SELECT id, tmdb_id, title, year, type, poster, poster_local, imdb_id FROM titles
+    sql: `SELECT id, tmdb_id, tmdb_kind, title, year, type, poster, poster_local, imdb_id FROM titles
           WHERE ${NEEDY}
           ORDER BY watched DESC LIMIT ?`,
     args: [limit],
@@ -75,23 +75,36 @@ export async function enrichTitles(limit = 60) {
       const isTv = String(row.type) === 'series'
       let tmdbId = row.tmdb_id ? Number(row.tmdb_id) : null
 
+      // Letterboxd logs anime/TV series as ordinary "films", so a title typed
+      // as a film can still only exist on TMDB's /tv side. Search the expected
+      // endpoint first, then fall back to the other one before giving up —
+      // otherwise those titles never get a tmdb_id, and so never get a poster.
+      let resolvedTv = row.tmdb_kind ? String(row.tmdb_kind) === 'tv' : isTv
       if (!tmdbId) {
-        const kind = isTv ? 'tv' : 'movie'
-        const q = new URLSearchParams({ api_key: tmdbKey, query: String(row.title) })
-        if (row.year) q.set(isTv ? 'first_air_date_year' : 'year', String(row.year))
-        const search = await $fetch<any>(`https://api.themoviedb.org/3/search/${kind}?${q}`, { timeout: 15_000 })
-        tmdbId = search?.results?.[0]?.id ?? null
+        const search = async (kind: 'movie' | 'tv') => {
+          const q = new URLSearchParams({ api_key: tmdbKey, query: String(row.title) })
+          if (row.year) q.set(kind === 'tv' ? 'first_air_date_year' : 'year', String(row.year))
+          const res = await $fetch<any>(`https://api.themoviedb.org/3/search/${kind}?${q}`, { timeout: 15_000 })
+          return res?.results?.[0]?.id ?? null
+        }
+        const primary = resolvedTv ? 'tv' : 'movie'
+        const secondary = resolvedTv ? 'movie' : 'tv'
+        tmdbId = await search(primary)
+        if (!tmdbId) {
+          tmdbId = await search(secondary)
+          if (tmdbId) resolvedTv = secondary === 'tv'
+        }
         if (!tmdbId) { failed++; continue }
       }
 
-      const kind = isTv ? 'tv' : 'movie'
+      const kind = resolvedTv ? 'tv' : 'movie'
       const det = await $fetch<any>(
         `https://api.themoviedb.org/3/${kind}/${tmdbId}?api_key=${tmdbKey}&append_to_response=credits,external_ids`,
         { timeout: 15_000 },
       )
 
-      const runtime = isTv ? seriesRuntime(det) : fmtRuntime(det.runtime)
-      const director = isTv
+      const runtime = resolvedTv ? seriesRuntime(det) : fmtRuntime(det.runtime)
+      const director = resolvedTv
         ? (det.created_by?.[0]?.name ?? '')
         : (det.credits?.crew?.find((c: any) => c.job === 'Director')?.name ?? '')
       const imdbId = det.external_ids?.imdb_id ?? det.imdb_id ?? null
@@ -102,11 +115,12 @@ export async function enrichTitles(limit = 60) {
         posterLocal = await downloadPoster(remote, Number(row.id))
       }
 
-      const run = isTv ? seriesRun(det) : { endYear: null, ended: null }
+      const run = resolvedTv ? seriesRun(det) : { endYear: null, ended: null }
 
       await d.execute({
         sql: `UPDATE titles SET
                 tmdb_id = COALESCE(tmdb_id, ?),
+                tmdb_kind = ?,
                 imdb_id = COALESCE(imdb_id, ?),
                 runtime = CASE WHEN runtime = '' THEN ? ELSE runtime END,
                 by = CASE WHEN by = '' THEN ? ELSE by END,
@@ -115,7 +129,7 @@ export async function enrichTitles(limit = 60) {
                 end_year = ?,
                 ended = ?
               WHERE id = ?`,
-        args: [tmdbId, imdbId, runtime, director, remote, posterLocal, run.endYear, run.ended, row.id],
+        args: [tmdbId, kind, imdbId, runtime, director, remote, posterLocal, run.endYear, run.ended, row.id],
       })
       enriched++
     } catch {
@@ -137,7 +151,7 @@ export async function refreshTmdb(limit = 60, afterId = 0, includeEdited = false
 
   const d = db()
   const rows = await d.execute({
-    sql: `SELECT id, tmdb_id, type, imdb_id FROM titles
+    sql: `SELECT id, tmdb_id, tmdb_kind, type, imdb_id FROM titles
           WHERE tmdb_id IS NOT NULL AND id > ? ${includeEdited ? '' : 'AND edited = 0'}
           ORDER BY id ASC LIMIT ?`,
     args: [afterId, limit],
@@ -150,7 +164,9 @@ export async function refreshTmdb(limit = 60, afterId = 0, includeEdited = false
   for (const row of rows.rows as any[]) {
     cursor = Number(row.id)
     try {
-      const isTv = String(row.type) === 'series'
+      // trust the recorded endpoint — a Letterboxd-logged series is type 'film'
+      // but its id only resolves under /tv
+      const isTv = row.tmdb_kind ? String(row.tmdb_kind) === 'tv' : String(row.type) === 'series'
       const kind = isTv ? 'tv' : 'movie'
       const det = await $fetch<any>(
         `https://api.themoviedb.org/3/${kind}/${row.tmdb_id}?api_key=${tmdbKey}&append_to_response=external_ids`,

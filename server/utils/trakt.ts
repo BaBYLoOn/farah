@@ -1,9 +1,10 @@
 import { db, getSetting, putSetting, syncWatchCache } from './db'
 
 // Trakt.tv — pulls the user's episode watch history and show ratings.
-// Needs a (free) Trakt app: trakt.tv/oauth/applications → set
-// NUXT_TRAKT_CLIENT_ID + NUXT_TRAKT_CLIENT_SECRET in .env, then use
-// "Connect Trakt" in the admin (device-code flow, token kept in settings).
+// Needs a (free) Trakt app: trakt.tv/oauth/applications. Paste its Client ID +
+// Secret into the admin (stored in the DB — no file editing needed), then use
+// "Connect Trakt" there: device-code flow, token kept in settings.
+// NUXT_TRAKT_CLIENT_ID / _SECRET in .env still work as a fallback.
 
 const API = 'https://api.trakt.tv'
 
@@ -18,9 +19,16 @@ type TraktToken = {
   expires_in: number
 }
 
-function clientCfg() {
+// The Trakt app credentials. Admin-entered keys (stored in the DB) win over the
+// env ones — so the site owner can paste their Trakt app id/secret in the admin
+// UI and connect WITHOUT editing any files.
+export async function getClientCfg() {
+  const stored = await getSetting<{ id?: string; secret?: string }>('trakt_client')
   const cfg = useRuntimeConfig()
-  return { id: cfg.traktClientId as string, secret: cfg.traktClientSecret as string }
+  return {
+    id: (stored?.id || cfg.traktClientId || '') as string,
+    secret: (stored?.secret || cfg.traktClientSecret || '') as string,
+  }
 }
 
 // headers for the OAuth endpoints (device code / token exchange)
@@ -28,34 +36,46 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', 'User-Agent': UA }
 }
 
-function apiHeaders(token?: string) {
-  const { id } = clientCfg()
+function apiHeaders(token: string | undefined, clientId: string) {
   return {
     'Content-Type': 'application/json',
     'User-Agent': UA,
     'trakt-api-version': '2',
-    'trakt-api-key': id,
+    'trakt-api-key': clientId,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 }
 
 // step 1 of connecting: get a code the user types at trakt.tv/activate
 export async function deviceCode() {
-  const { id } = clientCfg()
-  if (!id) throw createError({ statusCode: 400, statusMessage: 'No Trakt client id set (NUXT_TRAKT_CLIENT_ID)' })
-  const r = await $fetch<any>(`${API}/oauth/device/code`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: { client_id: id },
-    timeout: 15_000,
-  })
+  const { id } = await getClientCfg()
+  if (!id) throw createError({ statusCode: 400, statusMessage: 'No Trakt app keys yet — paste your Client ID + Secret in the admin first.' })
+  let r: any
+  try {
+    r = await $fetch<any>(`${API}/oauth/device/code`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: { client_id: id },
+      timeout: 15_000,
+    })
+  } catch (e: any) {
+    // Trakt answers a wrong/deleted app with a bare 401 — say what to actually fix
+    // instead of surfacing "Unauthorized".
+    if (e?.data?.error === 'invalid_client' || e?.statusCode === 401) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Trakt did not recognise that Client ID — check you copied it correctly from trakt.tv/oauth/applications, then save again.',
+      })
+    }
+    throw createError({ statusCode: 502, statusMessage: 'Could not reach Trakt just now — try again in a moment.' })
+  }
   await putSetting('trakt_device', r)
   return { userCode: r.user_code, url: r.verification_url, interval: r.interval }
 }
 
 // step 2: poll until the user has approved the code
 export async function devicePoll() {
-  const { id, secret } = clientCfg()
+  const { id, secret } = await getClientCfg()
   const dev = await getSetting<any>('trakt_device')
   if (!dev?.device_code) throw createError({ statusCode: 400, statusMessage: 'Start the connect flow first' })
   try {
@@ -80,7 +100,7 @@ async function accessToken(): Promise<string> {
   if (Date.now() < expiresAt - 86_400_000) return tok.access_token
 
   // refresh a token in its last day
-  const { id, secret } = clientCfg()
+  const { id, secret } = await getClientCfg()
   const fresh = await $fetch<TraktToken>(`${API}/oauth/token`, {
     method: 'POST',
     headers: authHeaders(),
@@ -102,6 +122,7 @@ async function accessToken(): Promise<string> {
 // delete/rewrite, so a mid-fetch API error can't wipe data.
 export async function syncTrakt() {
   const token = await accessToken()
+  const { id: clientId } = await getClientCfg()
   const d = db()
 
   let shows = 0
@@ -148,7 +169,7 @@ export async function syncTrakt() {
   for (let page = 1; page <= 100; page++) {
     const res: any[] = await $fetch<any[]>(
       `${API}/sync/history?type=episodes&limit=200&page=${page}`,
-      { headers: apiHeaders(token), timeout: 30_000 },
+      { headers: apiHeaders(token, clientId), timeout: 30_000 },
     )
     if (!res?.length) break
     for (const item of res) {
@@ -163,7 +184,7 @@ export async function syncTrakt() {
 
   // 2) fetch current show ratings (10-point already)
   const rated: any[] = await $fetch<any[]>(`${API}/sync/ratings/shows`, {
-    headers: apiHeaders(token),
+    headers: apiHeaders(token, clientId),
     timeout: 30_000,
   })
   const ratingByTitle = new Map<number, number>()

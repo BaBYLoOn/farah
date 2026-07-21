@@ -1,9 +1,16 @@
 <template>
+  <!-- boot overlay: covers the very first paint (before CSS/fonts settle) with a
+       clean background + spinner, then fades out — so no broken/unstyled flash.
+       Its critical CSS is injected inline into <head> (below) so it's styled from
+       the first frame regardless of when the main stylesheet loads. -->
+  <div class="app-boot" :class="{ hide: booted }" aria-hidden="true">
+    <span class="app-boot-spinner"></span>
+  </div>
+
   <Navbar v-if="!isAdmin" />
   <NuxtPage />
 
-  <!-- route-change loader (like husseinkhalid): a spinner while a page loads, so
-       navigation never flashes a half-rendered page. Teleported to body. -->
+  <!-- route-change loader (subsequent navigations) -->
   <ClientOnly>
     <Teleport to="body">
       <div class="route-loader" :class="{ show: routeLoading }" role="status" aria-label="Loading">
@@ -14,11 +21,33 @@
 </template>
 
 <script setup lang="ts">
-// The site navbar is fixed-position and must not sit over the admin dashboard.
 const route = useRoute()
 const isAdmin = computed(() => route.path.startsWith('/admin'))
 
-// delayed so an instant navigation doesn't flash the spinner
+// critical, inline boot styles — present in <head> on first paint
+useHead({
+  style: [{
+    key: 'app-boot',
+    innerHTML:
+      '.app-boot{position:fixed;inset:0;z-index:9999;background:#050404;display:flex;align-items:center;justify-content:center;opacity:1;transition:opacity .45s ease}' +
+      '.app-boot.hide{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s ease,visibility 0s .45s}' +
+      '.app-boot-spinner{width:34px;height:34px;border-radius:50%;border:2px solid rgba(216,210,196,.14);border-top-color:#8b0a0a;animation:appboot .8s linear infinite}' +
+      '@keyframes appboot{to{transform:rotate(360deg)}}',
+  }],
+})
+
+// reveal the page once fonts are ready (no FOUT) — with a safety timeout
+const booted = ref(false)
+onMounted(() => {
+  let settled = false
+  const finish = () => { if (!settled) { settled = true; requestAnimationFrame(() => { booted.value = true }) } }
+  const fonts = (document as any).fonts
+  if (fonts?.ready) fonts.ready.then(finish).catch(finish)
+  else finish()
+  setTimeout(finish, 1500) // never hang the boot overlay
+})
+
+// route-change loader (delayed so instant navs don't flash it)
 const routeLoading = ref(false)
 let timer: ReturnType<typeof setTimeout> | null = null
 const nuxtApp = useNuxtApp()
@@ -37,7 +66,7 @@ nuxtApp.hook('page:finish', () => { if (timer) clearTimeout(timer); routeLoading
 .route-spinner {
   width: 2rem; height: 2rem; border-radius: 50%;
   border: 2px solid rgba(216, 210, 196, 0.15);
-  border-top-color: #b81c1c;
+  border-top-color: #8b0a0a;
   animation: route-spin 0.8s linear infinite;
 }
 @keyframes route-spin { to { transform: rotate(360deg); } }

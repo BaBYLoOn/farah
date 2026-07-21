@@ -31,13 +31,15 @@
 
 /* ---- public page shell ---- */
 .cinema-page { max-width: 74rem; margin: 0 auto; padding: calc(var(--nav-h) + 0.5rem) clamp(1.1rem, 5vw, 3rem) 0; }
-.cinema-head { padding: 1.3rem 0 1.2rem; display: grid; gap: 0.05rem; text-align: center; }
+.cinema-head { padding: 1.3rem 0 1.2rem; display: grid; gap: 0; text-align: center; }
 .cinema-scope .placard {
-  margin: 0 0 0.05rem; font-family: var(--c-label); font-size: 0.72rem; letter-spacing: 0.36em;
-  text-transform: uppercase; color: var(--c-mute);
+  margin: 0; font-family: var(--c-label); font-size: 0.72rem; letter-spacing: 0.36em;
+  text-transform: uppercase; color: var(--c-mute); line-height: 1;
 }
 .cinema-marquee {
-  margin: 0; font-family: var(--c-display); font-weight: 700; letter-spacing: 0.06em;
+  /* pulled tight under the placard — no gap between "Farah's" and "Cinema" */
+  margin: -0.15rem 0 0; line-height: 0.9;
+  font-family: var(--c-display); font-weight: 700; letter-spacing: 0.06em;
   text-transform: uppercase; font-size: clamp(2rem, 8vw, 3.4rem); color: var(--c-accent);
   text-shadow: 0 0 30px var(--c-accent-glow);
 }

@@ -39,12 +39,37 @@
 
         <div class="crow trakt-row">
           <span class="trakt-label">Trakt — TV shows</span>
-          <button v-if="!trakt.connected" class="cbtn" :disabled="!!traktCode" @click="traktConnect">{{ traktCode ? 'Waiting for approval…' : 'Connect Trakt' }}</button>
-          <button class="cbtn" :disabled="traktSyncing" @click="traktSync">{{ traktSyncing ? 'Syncing…' : 'Sync Trakt (episodes + ratings)' }}</button>
-          <span v-if="trakt.connected" class="cmsg ok">Connected ✓</span>
-          <span v-if="traktCode" class="cmsg">Go to <b class="hl">{{ traktCode.url }}</b> and enter code <b class="hl">{{ traktCode.userCode }}</b></span>
+
+          <!-- Step 1: the app keys. Saved to the database, so connecting Trakt
+               never needs a file edit or a server restart. -->
+          <span v-if="!trakt.hasKeys || editKeys" class="trakt-step">
+            <span class="cmsg trakt-hint">
+              <b class="hl">Step 1 — your Trakt app.</b>
+              Open <b class="hl">trakt.tv/oauth/applications</b> → <b class="hl">New Application</b>.
+              Name it anything, and for <b class="hl">Redirect URI</b> paste
+              <code>urn:ietf:wg:oauth:2.0:oob</code>. Save it, then copy its
+              Client ID + Client Secret into the two boxes below.
+            </span>
+            <label class="cfield trakt-key"><span>Client ID</span><input v-model="keyId" type="text" placeholder="paste the Client ID" spellcheck="false" /></label>
+            <label class="cfield trakt-key"><span>Client Secret{{ trakt.hasSecret ? ' (leave blank to keep the saved one)' : '' }}</span><input v-model="keySecret" type="password" placeholder="paste the Client Secret" spellcheck="false" /></label>
+            <button class="cbtn" :disabled="keySaving || !keyId.trim()" @click="saveKeys">{{ keySaving ? 'Saving…' : 'Save Trakt keys' }}</button>
+            <button v-if="editKeys" class="cbtn ghost" @click="editKeys = false">Cancel</button>
+          </span>
+
+          <!-- Step 2: the device-code handshake -->
+          <template v-if="trakt.hasKeys && !editKeys">
+            <button v-if="!trakt.connected" class="cbtn" :disabled="!!traktCode" @click="traktConnect">{{ traktCode ? 'Waiting for approval…' : 'Connect Trakt' }}</button>
+            <button class="cbtn" :disabled="traktSyncing" @click="traktSync">{{ traktSyncing ? 'Syncing…' : 'Sync Trakt (episodes + ratings)' }}</button>
+            <span v-if="trakt.connected" class="cmsg ok">Connected ✓</span>
+            <button class="cbtn ghost" @click="startEditKeys">Change keys</button>
+          </template>
+
+          <span v-if="traktCode" class="cmsg trakt-code">
+            <b class="hl">Step 2 —</b> go to <b class="hl">{{ traktCode.url }}</b> and enter the code
+            <b class="hl code">{{ traktCode.userCode }}</b>
+            <em>Waiting for you to approve it… this page will say "Connected ✓" on its own.</em>
+          </span>
           <span v-if="traktMsg" class="cmsg" :class="{ err: traktErr }">{{ traktMsg }}</span>
-          <span v-if="!trakt.hasKeys" class="cmsg err trakt-hint">First add your Trakt app keys to <code>.env</code> — NUXT_TRAKT_CLIENT_ID + NUXT_TRAKT_CLIENT_SECRET from trakt.tv/oauth/applications — then restart. The buttons above will then work: Connect (enter the code it shows on Trakt) → Sync.</span>
         </div>
       </section>
 
@@ -207,7 +232,7 @@ const { data: traktStatus, refresh: refreshTrakt } = await useFetch<any>('/api/a
 const titles = ref<any[]>([])
 const favOrder = ref<{ film: number[]; series: number[] }>({ film: [], series: [] })
 watchEffect(() => { if (adminTitles.value) { titles.value = JSON.parse(JSON.stringify(adminTitles.value)); rebuildFavOrder() } })
-const trakt = computed(() => traktStatus.value ?? { hasKeys: false, connected: false })
+const trakt = computed(() => traktStatus.value ?? { hasKeys: false, connected: false, clientId: '', hasSecret: false })
 
 const msg = ref(''); const isErr = ref(false)
 const syncing = ref(false); const syncMsg = ref(''); const syncErr = ref(false); const processing = ref(false)
@@ -363,6 +388,22 @@ async function removeTitle(t: any) {
 
 // ── Trakt ──
 const traktCode = ref<any>(null); const traktSyncing = ref(false); const traktMsg = ref(''); const traktErr = ref(false)
+
+// Step 1: app keys, saved to the DB (no .env edit, no restart).
+const keyId = ref(''); const keySecret = ref(''); const keySaving = ref(false); const editKeys = ref(false)
+watchEffect(() => { if (!editKeys.value) keyId.value = trakt.value.clientId ?? '' })
+function startEditKeys() { editKeys.value = true; keyId.value = trakt.value.clientId ?? ''; keySecret.value = '' }
+async function saveKeys() {
+  keySaving.value = true; traktErr.value = false; traktMsg.value = ''
+  try {
+    await $fetch('/api/admin/trakt-keys', { method: 'POST', body: { id: keyId.value, secret: keySecret.value } })
+    keySecret.value = ''; editKeys.value = false
+    await refreshTrakt()
+    traktMsg.value = 'Trakt keys saved — now press "Connect Trakt"'
+  } catch (e: any) { traktErr.value = true; traktMsg.value = e?.statusMessage ?? 'Could not save the Trakt keys' }
+  finally { keySaving.value = false }
+}
+
 let traktTimer: ReturnType<typeof setInterval> | null = null
 async function traktConnect() {
   traktErr.value = false; traktMsg.value = ''
@@ -391,7 +432,14 @@ async function traktSync() {
 .crow { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: flex-end; }
 .trakt-row { border-top: 1px solid var(--c-line-soft); padding-top: 0.9rem; align-items: center; }
 .trakt-label { font-family: var(--c-label); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent); }
-.trakt-hint { flex-basis: 100%; }
+.trakt-hint { flex-basis: 100%; line-height: 1.65; }
+.trakt-hint code { font-size: 0.86em; padding: 0.1rem 0.35rem; border-radius: 3px; background: rgba(216, 210, 196, 0.08); }
+/* the key-entry step wraps onto its own full-width row */
+.trakt-step { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.7rem; }
+.trakt-key { flex: 1 1 16rem; }
+.trakt-code { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.trakt-code .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.15rem; letter-spacing: 0.22em; }
+.trakt-code em { flex-basis: 100%; font-style: italic; opacity: 0.75; }
 .cfield { display: grid; gap: 0.35rem; flex: 1 1 12rem; }
 .cfield.grow { flex: 2 1 14rem; } .cfield.sm { flex: 0 1 6.5rem; }
 .cfield.gold > span { color: var(--c-accent); }
