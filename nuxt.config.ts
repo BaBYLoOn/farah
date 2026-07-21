@@ -6,9 +6,17 @@ export default defineNuxtConfig({
     adminPasswordHash: '',
     dbUrl: 'file:.data/farah.db',
     dbAuthToken: '',
+    // ── Cinema ──
+    letterboxdRss: 'https://letterboxd.com/orchidee26_/rss/', // Farah's diary+reviews feed
+    tmdbApiKey: '',        // NUXT_TMDB_API_KEY
+    traktClientId: '',     // NUXT_TRAKT_CLIENT_ID (her Trakt app)
+    traktClientSecret: '', // NUXT_TRAKT_CLIENT_SECRET
     // nuxt-auth-utils reads session.password from NUXT_SESSION_PASSWORD
     session: {
       name: 'farah-admin',
+      // stay logged in: 1 year, refreshed each visit (sliding). Without it the
+      // cookie is a browser-session cookie that mobile Safari drops on close.
+      maxAge: 60 * 60 * 24 * 365,
       cookie: {
         sameSite: 'lax',
         // Secure cookie in production (behind HTTPS via Cloudflare/nginx),
