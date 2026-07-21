@@ -99,7 +99,7 @@
         <div v-if="f.reviews && f.reviews.length" class="title-reviews">
           <p v-for="rv in f.reviews" :key="rv.id" class="title-review">
             <span v-if="rv.reviewed" class="tr-date">{{ fmtDate(rv.reviewed) }}</span>
-            <span class="tr-text">{{ rv.text }}</span>
+            <span class="tr-text" dir="auto">{{ rv.text }}</span>
           </p>
         </div>
       </article>

@@ -1,5 +1,6 @@
 import { db, requireAdmin, syncWatchCache } from '../../utils/db'
 import { downloadPoster } from '../../utils/enrich'
+import { runPipelineInBackground } from '../../utils/pipeline'
 
 export default defineEventHandler(async (event) => {
   await requireAdmin(event)
@@ -27,5 +28,7 @@ export default defineEventHandler(async (event) => {
     await db().execute({ sql: 'INSERT INTO watches (title_id, watched) VALUES (?, ?)', args: [id, watched] })
     await syncWatchCache(id)
   }
+  // finish the data automatically (missing details + IMDb rating) in the background
+  runPipelineInBackground({ match: false })
   return { ok: true, id }
 })

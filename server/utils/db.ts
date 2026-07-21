@@ -159,9 +159,12 @@ export async function ensureDb(): Promise<void> {
         reviewed TEXT,
         text TEXT NOT NULL,
         rating REAL,
+        private INTEGER DEFAULT 0,
         guid TEXT UNIQUE
       )
     `)
+    // a dated note can be public (= a review, shown on the site) or private (admin only)
+    try { await client.execute(`ALTER TABLE reviews ADD COLUMN private INTEGER DEFAULT 0`) } catch { /* exists */ }
     await client.execute(`CREATE INDEX IF NOT EXISTS idx_reviews_title ON reviews (title_id)`)
     await client.execute(`CREATE TABLE IF NOT EXISTS sync_log (guid TEXT PRIMARY KEY)`)
     // key/value store for cinema settings (musicUrl, autosync, Trakt tokens, admin hash)
@@ -252,6 +255,7 @@ export function rowToReview(r: Record<string, unknown>) {
     reviewed: r.reviewed == null ? '' : String(r.reviewed),
     text: String(r.text ?? ''),
     rating: r.rating == null ? null : Number(r.rating),
+    private: Number(r.private ?? 0) === 1,
   }
 }
 

@@ -2032,6 +2032,21 @@ img { display: block; width: 100%; }
   box-shadow: 0 0 8px rgba(184, 28, 28, 0.6);
 }
 
+/* Mobile: keep the whole nav on one line. The 0.3em tracking + the hover/active
+   expansion (0.4em) pushed the links off the right edge, so tighten the tracking,
+   shrink the type, and DON'T expand tracking on tap. */
+@media (max-width: 560px) {
+  .site-nav-inner { padding: 0.7rem 0.9rem; }
+  .site-nav-mark { font-size: 0.95rem; letter-spacing: 0.14em; margin-left: 0.14em; padding: 0.3rem 0; }
+  .site-nav-divider { margin: 0 0.6rem; }
+  .site-nav-link {
+    font-size: 0.66rem; letter-spacing: 0.06em; margin-right: 0.35rem; padding: 0.5rem 0.15rem;
+    transition: color 0.5s ease;
+  }
+  .site-nav-link:hover, .site-nav-link.is-active { letter-spacing: 0.06em; }
+  .site-nav-link.is-active::after { left: 0.15rem; right: 0.15rem; }
+}
+
 /* Language toggle — far right */
 .site-nav-lang {
   background: transparent;

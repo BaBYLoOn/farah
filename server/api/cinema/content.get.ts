@@ -11,8 +11,8 @@ export default defineEventHandler(async () => {
   const films = titlesRes.rows.map((r: any) => ({ ...rowToTitle(r), reviews: [] as any[] }))
   const byId = new Map(films.map((t) => [t.id, t]))
 
-  // attach public reviews (newest first) to each title
-  const reviews = await db().execute('SELECT id, title_id, reviewed, text, rating FROM reviews ORDER BY reviewed DESC, id DESC')
+  // attach PUBLIC reviews (private=0) only — newest first
+  const reviews = await db().execute('SELECT id, title_id, reviewed, text, rating, private FROM reviews WHERE private = 0 ORDER BY reviewed DESC, id DESC')
   for (const r of reviews.rows as any[]) {
     byId.get(Number(r.title_id))?.reviews.push(rowToReview(r))
   }

@@ -110,7 +110,7 @@ export async function enrichTitles(limit = 60) {
                 imdb_id = COALESCE(imdb_id, ?),
                 runtime = CASE WHEN runtime = '' THEN ? ELSE runtime END,
                 by = CASE WHEN by = '' THEN ? ELSE by END,
-                poster = COALESCE(poster, ?),
+                poster = COALESCE(?, poster),
                 poster_local = COALESCE(?, poster_local),
                 end_year = ?,
                 ended = ?

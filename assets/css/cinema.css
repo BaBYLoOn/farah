@@ -24,8 +24,13 @@
   color: var(--c-ink);
 }
 
+/* height of the fixed site nav — the cinema head clears it and the sticky deck
+   docks right beneath it */
+:root { --nav-h: 4.1rem; }
+@media (min-width: 700px) { :root { --nav-h: 4.85rem; } }
+
 /* ---- public page shell ---- */
-.cinema-page { max-width: 74rem; margin: 0 auto; padding: 0 clamp(1.1rem, 5vw, 3rem); }
+.cinema-page { max-width: 74rem; margin: 0 auto; padding: calc(var(--nav-h) + 0.6rem) clamp(1.1rem, 5vw, 3rem) 0; }
 .cinema-head { padding: 1.5rem 0 1.2rem; display: grid; gap: 0.6rem; text-align: center; }
 .cinema-scope .placard {
   margin: 0; font-family: var(--c-label); font-size: 0.72rem; letter-spacing: 0.36em;
@@ -36,7 +41,26 @@
   text-transform: uppercase; font-size: clamp(2rem, 8vw, 3.4rem); color: var(--c-accent);
   text-shadow: 0 0 30px var(--c-accent-glow);
 }
-.back-to-cinema { color: var(--c-accent); text-decoration: none; letter-spacing: 0.1em; }
+/* back-to-top — fixed bottom-right, crimson (teleported to body, so it uses the
+   site's global tokens, not the .cinema-scope ones) */
+.cinema-totop {
+  position: fixed; right: 1.1rem; bottom: 1.3rem; z-index: 60;
+  width: 2.9rem; height: 2.9rem; display: grid; place-items: center;
+  border-radius: 999px; border: 1px solid var(--crimson-bright);
+  background: rgba(107, 0, 0, 0.9); color: #ede7d9; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(184, 28, 28, 0.45);
+  transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+.cinema-totop:hover { background: var(--crimson-bright); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 0 22px rgba(184,28,28,0.6); }
+.cinema-totop svg { width: 1.3rem; height: 1.3rem; }
+
+.back-to-cinema {
+  display: inline-flex; align-items: center; gap: 0.35rem; color: var(--c-accent); text-decoration: none;
+  font-family: var(--c-label); font-size: 0.64rem; letter-spacing: 0.16em; text-transform: uppercase;
+  border: 1px solid var(--c-accent-soft); border-radius: 999px; padding: 0.45rem 0.95rem;
+  transition: background 0.3s var(--c-ease), color 0.3s var(--c-ease);
+}
+.back-to-cinema:hover { background: rgba(205, 191, 158, 0.14); color: var(--c-ink); }
 
 /* ---- favourites carousels ---- */
 .favs { padding: 0.4rem 0 1.4rem; display: grid; gap: 0.7rem; }
@@ -77,9 +101,11 @@
 /* ---- archive (shared: public + admin) ---- */
 .archive-section { display: grid; gap: 0.1rem; padding-top: 1rem; }
 .archive-controls {
-  position: sticky; top: 0; z-index: 20; display: grid; gap: 0.85rem;
+  /* dock right below the fixed nav so the WHOLE deck — Watched/Diary included —
+     stays visible when the titles scroll under it (not hidden behind the nav) */
+  position: sticky; top: var(--nav-h); z-index: 30; display: grid; gap: 0.85rem;
   padding: 0.9rem 0 0.9rem;
-  background: linear-gradient(var(--c-bg) 86%, rgba(5, 4, 4, 0.7) 95%, transparent);
+  background: linear-gradient(var(--c-bg) 80%, rgba(5, 4, 4, 0.85) 92%, transparent);
 }
 .tabs2 { display: flex; gap: clamp(1.2rem, 5vw, 2.4rem); align-items: baseline; border-bottom: 1px solid var(--c-line); }
 .tabs2 button {
@@ -92,15 +118,20 @@
 .tabs2 button:hover { color: var(--c-ink); }
 .tabs2 button.on { color: var(--c-ink); border-bottom-color: var(--c-red-strong); }
 
-.sorts2 { display: flex; align-items: center; flex-wrap: wrap; gap: 0.55rem; font-family: var(--c-label); }
+.sorts2 { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; font-family: var(--c-label); }
 .sorts2 button {
-  background: none; border: none; cursor: pointer; font-family: var(--c-label);
-  font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-mute);
-  padding: 0.2rem 0; display: inline-flex; align-items: center; gap: 0.3rem; transition: color 0.3s var(--c-ease);
+  position: relative; background: none; border: none; cursor: pointer; font-family: var(--c-label);
+  font-size: 0.64rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-ink-dim);
+  padding: 0.25rem 0 0.4rem; display: inline-flex; align-items: center; gap: 0.3rem; transition: color 0.3s var(--c-ease);
 }
 .sorts2 button b { font-size: 0.92em; color: var(--c-accent); }
 .sorts2 button:hover { color: var(--c-ink); }
+/* selected filter / sort — brighter (ivory) with a crimson underline, matching the tabs */
 .sorts2 button.on { color: var(--c-ink); }
+.sorts2 button.on::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px;
+  background: var(--c-red-strong); box-shadow: 0 0 8px rgba(184, 28, 28, 0.55);
+}
 .vsep { width: 1px; height: 0.8rem; background: var(--c-line); }
 .sort-star { font-size: 0.9em; }
 .sort-star.gold { color: var(--c-accent); }
@@ -160,7 +191,10 @@
 .title-reviews { grid-column: 1 / -1; display: grid; gap: 0.6rem; margin: 0.5rem 0 0.2rem; padding-left: 0.2rem; }
 .title-review { margin: 0; padding: 0.5rem 0 0.15rem 1rem; border-left: 2px solid var(--c-red-strong); }
 .tr-date { display: block; font-family: var(--c-label); font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-mute); margin-bottom: 0.3rem; }
-.tr-text { font-family: var(--c-body); font-size: 1.08rem; line-height: 1.65; color: var(--c-ink-dim); white-space: pre-line; }
+/* review body: Latin uses Cormorant, Arabic falls to the site's Thmanyah serif;
+   dir="auto" on the element flips Arabic reviews to RTL. Same size for both. */
+.tr-text { font-family: 'Cormorant Garamond', 'ThmanyahSerifDisplay', serif; font-size: 1.12rem; line-height: 1.75; color: var(--c-ink-dim); white-space: pre-line; }
+.tr-text:lang(ar), .tr-text[dir='rtl'] { font-size: 1.06rem; line-height: 1.9; }
 
 /* ---- diary ---- */
 .diary-month { font-family: var(--c-label); font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-accent); margin: 1.3rem 0 0.5rem; }

@@ -88,8 +88,8 @@ export async function syncLetterboxd() {
     const memberRating = tag(item, 'letterboxd:memberRating')
     const myRating = memberRating != null ? Number(memberRating) * 2 : null
     const tmdbId = Number(tag(item, 'tmdb:movieId') ?? 0) || null
-    const posterMatch = item.match(/<img src="([^"]+)"/)
-    const poster = posterMatch ? posterMatch[1] : null
+    // NB: we deliberately do NOT store the Letterboxd poster — the poster comes
+    // from TMDB via enrichment (higher quality, and a downloaded local fallback)
 
     const existing = await d.execute({
       sql: `SELECT id, edited FROM titles
@@ -107,18 +107,17 @@ export async function syncLetterboxd() {
       await d.execute({
         sql: `UPDATE titles SET
                 tmdb_id = COALESCE(tmdb_id, ?),
-                my_rating = CASE WHEN ? AND ? IS NOT NULL THEN ? ELSE my_rating END,
-                poster = CASE WHEN ? AND poster IS NULL THEN ? ELSE poster END
+                my_rating = CASE WHEN ? AND ? IS NOT NULL THEN ? ELSE my_rating END
               WHERE id = ?`,
-        args: [tmdbId, edited ? 0 : 1, myRating, myRating, edited ? 0 : 1, poster, titleId],
+        args: [tmdbId, edited ? 0 : 1, myRating, myRating, titleId],
       })
       updated++
     } else {
       const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       const ins = await d.execute({
-        sql: `INSERT INTO titles (tmdb_id, slug, title, year, type, by, runtime, my_rating, imdb, watched, watches, poster)
-              VALUES (?,?,?,?,'film','','',?,NULL,?,1,?)`,
-        args: [tmdbId, slug, title, year, myRating, watchedDate, poster],
+        sql: `INSERT INTO titles (tmdb_id, slug, title, year, type, by, runtime, my_rating, imdb, watched, watches)
+              VALUES (?,?,?,?,'film','','',?,NULL,?,1)`,
+        args: [tmdbId, slug, title, year, myRating, watchedDate],
       })
       titleId = Number(ins.lastInsertRowid)
       imported++
