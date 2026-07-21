@@ -22,14 +22,17 @@
         <button :class="{ on: filterType === 'review' }" title="Titles with a review" @click="filterType = 'review'">Reviews <b v-if="counts.review != null">{{ counts.review }}</b></button>
       </div>
 
-      <!-- sort (watched only) + view toggle -->
-      <div v-if="tab === 'watched'" class="sorts2 sortline">
-        <template v-for="(opt, i) in sortOptions" :key="opt.key">
-          <span v-if="i" class="vsep" aria-hidden="true"></span>
-          <button :class="{ on: sortBy === opt.key }" @click="setSort(opt.key)">
-            <span v-if="opt.star" class="sort-star" :class="opt.star" aria-hidden="true">★</span>{{ opt.label }}<template v-if="sortBy === opt.key"> {{ dir === 'desc' ? '↓' : '↑' }}</template>
-          </button>
-        </template>
+      <!-- sort (watched only) + view toggle — always ONE line: the sorts scroll
+           sideways if they must, the toggle stays pinned at the end -->
+      <div v-if="tab === 'watched'" class="sortline">
+        <div class="sorts2 sortscroll">
+          <template v-for="(opt, i) in sortOptions" :key="opt.key">
+            <span v-if="i" class="vsep" aria-hidden="true"></span>
+            <button :class="{ on: sortBy === opt.key }" @click="setSort(opt.key)">
+              <span v-if="opt.star" class="sort-star" :class="opt.star" aria-hidden="true">★</span>{{ opt.label }}<template v-if="sortBy === opt.key"> {{ dir === 'desc' ? '↓' : '↑' }}</template>
+            </button>
+          </template>
+        </div>
         <div class="viewtoggle2">
           <button :aria-label="view === 'list' ? 'Grid view' : 'List view'" @click="view = view === 'list' ? 'cards' : 'list'">
             <svg v-if="view === 'list'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>

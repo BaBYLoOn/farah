@@ -139,8 +139,40 @@
 .sort-star { font-size: 0.9em; }
 .sort-star.gold { color: var(--c-accent); }
 .sort-star.red { color: var(--c-red); }
-.viewtoggle2 { margin-left: auto; }
-.viewtoggle2 button { color: var(--c-mute); padding: 0.2rem; }
+/* The sort row keeps the list/grid toggle on the SAME line as Watched…A–Z at
+   every width. The sorts take the leftover space and scroll sideways when they
+   don't fit (min-width:0 is what lets a flex child shrink below its content);
+   the toggle never shrinks and never wraps. */
+/* min-width:0 because .sortline is a grid child of .archive-controls, and a grid
+   item defaults to min-width:auto — without it the row refuses to shrink and
+   pushes the whole page into horizontal scroll on a narrow phone. */
+.sortline { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.6rem; min-width: 0; }
+.sortscroll {
+  flex: 1 1 auto; min-width: 0; flex-wrap: nowrap;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+.sortscroll::-webkit-scrollbar { display: none; }
+/* the .on underline sits at the button's bottom edge — keep it out of the clip */
+.sortscroll button { padding-bottom: 0.45rem; }
+/* On a phone, tighten the row so all five sorts genuinely FIT beside the toggle
+   rather than relying on the scroll. Below ~360px the scroll takes over. */
+@media (max-width: 420px) {
+  .sortscroll { gap: 0.36rem; }
+  .sortscroll button { letter-spacing: 0.08em; }
+}
+
+.viewtoggle2 { flex: 0 0 auto; margin-left: auto; }
+/* The toggle used to sit inside .sorts2 and inherit its button reset. It's now a
+   sibling of the scroller, so it has to carry that reset itself — otherwise the
+   browser's default button chrome shows through as a white box. */
+.viewtoggle2 button {
+  background: none; border: none; cursor: pointer;
+  display: inline-flex; align-items: center;
+  color: var(--c-mute); padding: 0.2rem; transition: color 0.3s var(--c-ease);
+}
+.viewtoggle2 button:hover { color: var(--c-ink); }
 .viewtoggle2 svg { width: 1rem; height: 1rem; }
 
 .focus-bar {
