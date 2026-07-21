@@ -1968,7 +1968,9 @@ img { display: block; width: 100%; }
 .site-nav {
   position: fixed; top: 0; left: 0; right: 0;
   z-index: 50;
-  background: rgba(5, 4, 4, 0.94);
+  /* solid (was 0.94) so content can't ghost through it, and it matches the cinema
+     deck colour exactly — the two read as one bar when the archive is docked */
+  background: #050404;
   border-bottom: 1px solid rgba(216, 210, 196, 0.06);
 }
 

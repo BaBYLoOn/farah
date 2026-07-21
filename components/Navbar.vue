@@ -5,7 +5,7 @@
       <span class="site-nav-divider" aria-hidden="true" />
       <NuxtLink class="site-nav-link" :class="{ 'is-active': active === 'essays' }" to="/#essays">Essays</NuxtLink>
       <NuxtLink class="site-nav-link" :class="{ 'is-active': active === 'weblog' }" to="/#weblog">Weblog</NuxtLink>
-      <NuxtLink class="site-nav-link" to="/cinema">Cinema</NuxtLink>
+      <NuxtLink class="site-nav-link" :class="{ 'is-active': route.path.startsWith('/cinema') }" to="/cinema">Cinema</NuxtLink>
     </div>
   </nav>
 </template>

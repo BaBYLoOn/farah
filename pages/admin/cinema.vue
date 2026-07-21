@@ -32,21 +32,19 @@
         <div class="crow">
           <label class="cfield"><span>Reviews (reviews.csv) — full review history (diary first)</span><input type="file" accept=".csv,text/csv" @change="importReviews" /></label>
         </div>
+        <div class="crow">
+          <label class="cfield"><span>Ratings (ratings.csv) — adds rated films not in the diary (no diary record)</span><input type="file" accept=".csv,text/csv" @change="importRatings" /></label>
+        </div>
         <label class="ccheck"><input type="checkbox" :checked="autosyncPaused" @change="setAutosyncPaused(($event.target as HTMLInputElement).checked)" /> Pause automatic syncing (while I upload)</label>
 
         <div class="crow trakt-row">
-          <template v-if="!trakt.hasKeys">
-            <span class="cmsg err">Trakt keys missing — create an app at trakt.tv/oauth/applications, set NUXT_TRAKT_CLIENT_ID + NUXT_TRAKT_CLIENT_SECRET in .env, then restart. The Connect button appears here once the keys are set.</span>
-          </template>
-          <template v-else-if="!trakt.connected">
-            <button class="cbtn" :disabled="!!traktCode" @click="traktConnect">Connect Trakt</button>
-            <span v-if="traktCode" class="cmsg">Go to <b class="hl">{{ traktCode.url }}</b> and enter code <b class="hl">{{ traktCode.userCode }}</b> — waiting…</span>
-          </template>
-          <template v-else>
-            <button class="cbtn" :disabled="traktSyncing" @click="traktSync">{{ traktSyncing ? 'Syncing…' : 'Sync Trakt (episodes + ratings)' }}</button>
-            <span class="cmsg ok">Trakt connected ✓</span>
-          </template>
+          <span class="trakt-label">Trakt — TV shows</span>
+          <button v-if="!trakt.connected" class="cbtn" :disabled="!!traktCode" @click="traktConnect">{{ traktCode ? 'Waiting for approval…' : 'Connect Trakt' }}</button>
+          <button class="cbtn" :disabled="traktSyncing" @click="traktSync">{{ traktSyncing ? 'Syncing…' : 'Sync Trakt (episodes + ratings)' }}</button>
+          <span v-if="trakt.connected" class="cmsg ok">Connected ✓</span>
+          <span v-if="traktCode" class="cmsg">Go to <b class="hl">{{ traktCode.url }}</b> and enter code <b class="hl">{{ traktCode.userCode }}</b></span>
           <span v-if="traktMsg" class="cmsg" :class="{ err: traktErr }">{{ traktMsg }}</span>
+          <span v-if="!trakt.hasKeys" class="cmsg err trakt-hint">First add your Trakt app keys to <code>.env</code> — NUXT_TRAKT_CLIENT_ID + NUXT_TRAKT_CLIENT_SECRET from trakt.tv/oauth/applications — then restart. The buttons above will then work: Connect (enter the code it shows on Trakt) → Sync.</span>
         </div>
       </section>
 
@@ -265,6 +263,12 @@ async function importReviews(e: Event) {
   try { const fd = new FormData(); fd.append('file', f); const r = await $fetch<any>('/api/admin/import-reviews', { method: 'POST', body: fd }); syncMsg.value = `Reviews: ${r.added} attached, ${r.nomatch} not-yet-in-diary, ${r.skipped} skipped`; await reload() }
   catch (er: any) { syncErr.value = true; syncMsg.value = er?.statusMessage ?? 'Import failed' }
 }
+async function importRatings(e: Event) {
+  const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return
+  syncMsg.value = 'Importing ratings…'; syncErr.value = false
+  try { const fd = new FormData(); fd.append('file', f); const r = await $fetch<any>('/api/admin/import-ratings', { method: 'POST', body: fd }); syncMsg.value = `Ratings: ${r.added} rated films added (not in diary), ${r.present} already had — fetching details…`; await reload() }
+  catch (er: any) { syncErr.value = true; syncMsg.value = er?.statusMessage ?? 'Import failed' }
+}
 
 // ── add title (TMDB) ──
 const q = ref(''); const hits = ref<any[]>([]); const draft = ref<any>(null)
@@ -386,6 +390,8 @@ async function traktSync() {
 .cadmin-note code { font-family: ui-monospace, monospace; font-size: 0.85em; color: var(--c-ink); }
 .crow { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: flex-end; }
 .trakt-row { border-top: 1px solid var(--c-line-soft); padding-top: 0.9rem; align-items: center; }
+.trakt-label { font-family: var(--c-label); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent); }
+.trakt-hint { flex-basis: 100%; }
 .cfield { display: grid; gap: 0.35rem; flex: 1 1 12rem; }
 .cfield.grow { flex: 2 1 14rem; } .cfield.sm { flex: 0 1 6.5rem; }
 .cfield.gold > span { color: var(--c-accent); }

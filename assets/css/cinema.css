@@ -24,16 +24,16 @@
   color: var(--c-ink);
 }
 
-/* height of the fixed site nav — the cinema head clears it and the sticky deck
-   docks right beneath it */
-:root { --nav-h: 4.1rem; }
-@media (min-width: 700px) { :root { --nav-h: 4.85rem; } }
+/* height of the fixed site nav; --deck-top is a hair LESS so the sticky deck
+   tucks under the nav (both solid, same colour) and they read as one bar */
+:root { --nav-h: 4.1rem; --deck-top: 3.7rem; }
+@media (min-width: 700px) { :root { --nav-h: 4.85rem; --deck-top: 4.45rem; } }
 
 /* ---- public page shell ---- */
-.cinema-page { max-width: 74rem; margin: 0 auto; padding: calc(var(--nav-h) + 0.6rem) clamp(1.1rem, 5vw, 3rem) 0; }
-.cinema-head { padding: 1.5rem 0 1.2rem; display: grid; gap: 0.6rem; text-align: center; }
+.cinema-page { max-width: 74rem; margin: 0 auto; padding: calc(var(--nav-h) + 0.5rem) clamp(1.1rem, 5vw, 3rem) 0; }
+.cinema-head { padding: 1.3rem 0 1.2rem; display: grid; gap: 0.05rem; text-align: center; }
 .cinema-scope .placard {
-  margin: 0; font-family: var(--c-label); font-size: 0.72rem; letter-spacing: 0.36em;
+  margin: 0 0 0.05rem; font-family: var(--c-label); font-size: 0.72rem; letter-spacing: 0.36em;
   text-transform: uppercase; color: var(--c-mute);
 }
 .cinema-marquee {
@@ -45,13 +45,13 @@
    site's global tokens, not the .cinema-scope ones) */
 .cinema-totop {
   position: fixed; right: 1.1rem; bottom: 1.3rem; z-index: 60;
-  width: 2.9rem; height: 2.9rem; display: grid; place-items: center;
-  border-radius: 999px; border: 1px solid var(--crimson-bright);
-  background: rgba(107, 0, 0, 0.9); color: #ede7d9; cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(184, 28, 28, 0.45);
-  transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+  width: 2.8rem; height: 2.8rem; display: grid; place-items: center;
+  border-radius: 999px; border: 1px solid rgba(139, 10, 10, 0.55);
+  background: rgba(30, 12, 12, 0.9); color: #d8d2c4; cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  transition: transform 0.2s ease, background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
-.cinema-totop:hover { background: var(--crimson-bright); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 0 22px rgba(184,28,28,0.6); }
+.cinema-totop:hover { background: rgba(107, 0, 0, 0.7); border-color: rgba(184, 28, 28, 0.7); color: #ede7d9; transform: translateY(-2px); }
 .cinema-totop svg { width: 1.3rem; height: 1.3rem; }
 
 .back-to-cinema {
@@ -101,11 +101,12 @@
 /* ---- archive (shared: public + admin) ---- */
 .archive-section { display: grid; gap: 0.1rem; padding-top: 1rem; }
 .archive-controls {
-  /* dock right below the fixed nav so the WHOLE deck — Watched/Diary included —
-     stays visible when the titles scroll under it (not hidden behind the nav) */
-  position: sticky; top: var(--nav-h); z-index: 30; display: grid; gap: 0.85rem;
-  padding: 0.9rem 0 0.9rem;
-  background: linear-gradient(var(--c-bg) 80%, rgba(5, 4, 4, 0.85) 92%, transparent);
+  /* tuck under the fixed nav (top < nav height, z-index below the nav) so the two
+     read as ONE solid bar — no gap where titles peek through — while the whole
+     deck (Watched/Diary included) stays visible below the nav as titles scroll */
+  position: sticky; top: var(--deck-top); z-index: 30; display: grid; gap: 0.85rem;
+  padding: 1.1rem 0 0.9rem;
+  background: linear-gradient(var(--c-bg), var(--c-bg) 88%, transparent);
 }
 .tabs2 { display: flex; gap: clamp(1.2rem, 5vw, 2.4rem); align-items: baseline; border-bottom: 1px solid var(--c-line); }
 .tabs2 button {
