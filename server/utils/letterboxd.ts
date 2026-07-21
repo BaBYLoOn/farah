@@ -1,5 +1,6 @@
 import { db, syncWatchCache } from './db'
 import { extractReviewText, upsertReview } from './reviews'
+import { downloadPoster } from './enrich'
 
 const UA = 'farahali.com/1.0'
 
@@ -45,11 +46,11 @@ export async function resolveLetterboxdTmdb(limit = 40, afterId = 0) {
       const wrong = had != null && Number(had) !== tmdbId
       if (wrong) corrected++
       await d.execute({
-        sql: `UPDATE titles SET tmdb_id = ?, type = ?,
+        sql: `UPDATE titles SET tmdb_id = ?, type = ?, tmdb_kind = ?,
                 imdb_id = CASE WHEN ? THEN NULL ELSE imdb_id END,
                 poster = CASE WHEN ? THEN NULL ELSE poster END
               WHERE id = ?`,
-        args: [tmdbId, type, wrong ? 1 : 0, wrong ? 1 : 0, row.id],
+        args: [tmdbId, type, typeM?.[1] === 'tv' ? 'tv' : 'movie', wrong ? 1 : 0, wrong ? 1 : 0, row.id],
       })
       matched++
     } catch {
@@ -59,6 +60,67 @@ export async function resolveLetterboxdTmdb(limit = 40, afterId = 0) {
   }
 
   return { matched, corrected, failed, cursor, done: rows.rows.length < limit }
+}
+
+// Letterboxd sends its film pages' artwork only to a browser-shaped UA.
+const BROWSER_UA =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
+// Pull the poster Letterboxd shows for a film. Its JSON-LD carries the artwork
+// URL; the size is encoded in the filename, so ask for 600x900 rather than the
+// 230x345 thumbnail some pages embed.
+function posterFromHtml(html: string): string | null {
+  const m = html.match(/"image":"(https:\/\/a\.ltrbxd\.com\/resized\/film-poster\/[^"]+)"/)
+  if (!m) return null
+  return m[1].replace(/-0-\d+-0-\d+-crop\./, '-0-600-0-900-crop.')
+}
+
+// Last-resort poster source for titles TMDB simply has no artwork for — mostly
+// experimental shorts, which is a real slice of Farah's diary. Only ever fills a
+// gap: titles that already have a poster are never touched.
+export async function letterboxdPosters(limit = 40, afterId = 0) {
+  const d = db()
+  const rows = await d.execute({
+    sql: `SELECT id, lb_uri FROM titles
+          WHERE lb_uri IS NOT NULL AND lb_uri != ''
+            AND poster IS NULL AND poster_local IS NULL
+            AND id > ?
+          ORDER BY id ASC LIMIT ?`,
+    args: [afterId, limit],
+  })
+
+  let filled = 0, failed = 0, cursor = afterId
+
+  for (const row of rows.rows as any[]) {
+    cursor = Number(row.id)
+    try {
+      const get = (u: string) =>
+        $fetch<string>(u, { responseType: 'text', headers: { 'User-Agent': BROWSER_UA }, timeout: 20_000 })
+
+      const html = String(await get(String(row.lb_uri).replace(/\/$/, '') + '/'))
+      let poster = posterFromHtml(html)
+
+      // A stored lb_uri is often a diary-entry page, which carries a backdrop
+      // rather than the poster — follow it through to the film page.
+      if (!poster) {
+        const slug = html.match(/\/film\/[a-z0-9][a-z0-9-]*\//)?.[0]
+        if (slug) poster = posterFromHtml(String(await get(`https://letterboxd.com${slug}`)))
+      }
+      if (!poster) { failed++; continue }
+
+      const local = await downloadPoster(poster, Number(row.id))
+      await d.execute({
+        sql: 'UPDATE titles SET poster = COALESCE(poster, ?), poster_local = COALESCE(poster_local, ?) WHERE id = ?',
+        args: [poster, local, row.id],
+      })
+      filled++
+    } catch {
+      failed++
+    }
+    await new Promise((r) => setTimeout(r, 900)) // be polite to Letterboxd
+  }
+
+  return { filled, failed, cursor, done: rows.rows.length < limit }
 }
 
 // Sync Farah's Letterboxd RSS (latest ~50). Per the requirement, DIARIES are

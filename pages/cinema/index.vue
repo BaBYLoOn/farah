@@ -12,7 +12,7 @@
       </div>
       <div class="favs-carousel" tabindex="0" aria-label="Swipe through favorite films">
         <a v-for="f in favFilms" :key="f.id" class="fav" :title="f.title" v-bind="imdbAttrs(f)">
-          <img v-poster v-if="posterOf(f)" :src="posterOf(f)" alt="" loading="lazy" @error="onPosterErr($event, f)" />
+          <img v-poster v-if="posterOf(f)" :src="posterOf(f)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, f)" />
           <span v-else class="fav-fallback">{{ f.title }}</span>
         </a>
         <NuxtLink to="/cinema/favorites" class="fav fav-more" aria-label="See all favorite films">
@@ -29,7 +29,7 @@
       </div>
       <div class="favs-carousel" tabindex="0" aria-label="Swipe through favorite series">
         <a v-for="f in favSeries" :key="f.id" class="fav" :title="f.title" v-bind="imdbAttrs(f)">
-          <img v-poster v-if="posterOf(f)" :src="posterOf(f)" alt="" loading="lazy" @error="onPosterErr($event, f)" />
+          <img v-poster v-if="posterOf(f)" :src="posterOf(f)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, f)" />
           <span v-else class="fav-fallback">{{ f.title }}</span>
         </a>
         <NuxtLink to="/cinema/favorites" class="fav fav-more" aria-label="See all favorite series">
@@ -87,11 +87,18 @@ async function loadDiary() {
   }
 }
 
+// Warm the diary in the background once the page is idle, so opening the Diary
+// tab is instant instead of showing a spinner while it fetches.
+function prefetchDiary() {
+  const idle = (window as any).requestIdleCallback ?? ((fn: () => void) => setTimeout(fn, 400))
+  idle(() => { loadDiary() })
+}
+
 // back-to-top button (fixed, appears once you've scrolled a screen)
 const showTop = ref(false)
 function onScroll() { showTop.value = window.scrollY > 500 }
 function scrollTop() { window.scrollTo({ top: 0, behavior: 'smooth' }) }
-onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }); onScroll() })
+onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }); onScroll(); prefetchDiary() })
 onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 
 function imdbAttrs(f: any) {

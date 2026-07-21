@@ -54,7 +54,7 @@
           <article v-for="(e, i) in g.entries" :key="`${e.id}-${g.key}-${e.day}-${i}`" class="diary-row">
             <span class="diary-day">{{ e.day }}</span>
             <a class="thumb-link" v-bind="imdbAttrs(e)">
-              <img v-poster v-if="posterOf(e)" class="diary-thumb" :src="posterOf(e)" alt="" loading="lazy" @error="onPosterErr($event, e)" />
+              <img v-poster v-if="posterOf(e)" class="diary-thumb" :src="posterOf(e)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, e)" />
               <div v-else class="diary-thumb diary-thumb-fallback" aria-hidden="true">{{ e.title.charAt(0) }}</div>
               <button v-if="admin" type="button" class="arch-edit small" title="Edit title" @click.stop.prevent="emit('edit', e)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
             </a>
@@ -80,7 +80,7 @@
     <div v-else-if="view === 'list' && shown.length" class="list">
       <article v-for="f in visible" :key="f.id" :id="`t-${f.id}`" class="lrow" :class="{ 'is-fav': isFav(f), focused: focusId === f.id }">
         <a class="thumb-link" v-bind="imdbAttrs(f)">
-          <img v-poster v-if="posterOf(f)" class="thumb" :src="posterOf(f)" alt="" loading="lazy" @error="onPosterErr($event, f)" />
+          <img v-poster v-if="posterOf(f)" class="thumb" :src="posterOf(f)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, f)" />
           <div v-else class="thumb-fallback" aria-hidden="true">{{ f.title.charAt(0) }}</div>
           <button v-if="admin" type="button" class="arch-edit" title="Edit title" @click.stop.prevent="emit('edit', f)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
           <span v-if="isFav(f)" class="fav-badge" title="In your favorites" aria-hidden="true">♥</span>
@@ -109,7 +109,7 @@
     <div v-else-if="shown.length" class="archive">
       <article v-for="(f, i) in visible" :key="f.id" class="film" :class="{ 'is-fav': isFav(f) }" v-reveal="(i % 8) * 45">
         <a class="film-frame" v-bind="imdbAttrs(f)" :title="f.title">
-          <img v-poster v-if="posterOf(f)" :src="posterOf(f)" alt="" loading="lazy" @error="onPosterErr($event, f)" />
+          <img v-poster v-if="posterOf(f)" :src="posterOf(f)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, f)" />
           <div v-else class="no-poster" aria-hidden="true"><span class="np-year">{{ f.year }}</span><span class="np-title">{{ f.title }}</span></div>
           <button v-if="admin" type="button" class="arch-edit" title="Edit title" @click.stop.prevent="emit('edit', f)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
           <span v-if="isFav(f)" class="fav-badge" title="In your favorites" aria-hidden="true">♥</span>
@@ -256,6 +256,10 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 const shown = computed(() => {
   if (tab.value === 'diary') {
+    // Hold a REFERENCE to the title plus the record's own fields. Merging them
+    // into a new object here would copy all ~550 diary entries on every tab,
+    // filter or search change when only `limit` of them are ever rendered —
+    // diaryGroups does the merge, for the visible slice only.
     const byId = filmsById.value
     const out: any[] = []
     for (const r of (props.diaryRecords ?? [])) {
@@ -263,7 +267,7 @@ const shown = computed(() => {
       if (!f || !matchSearch(f)) continue
       if (filterType.value === 'review') { if (!hasReview(f)) continue }
       else if (filterType.value !== 'all' && f.type !== filterType.value) continue
-      out.push({ ...f, watched: r.watched, season: r.season, episode: r.episode })
+      out.push({ f, watched: r.watched, season: r.season, episode: r.episode })
     }
     return out
   }
@@ -293,21 +297,27 @@ const shown = computed(() => {
 
 const diaryGroups = computed(() => {
   const groups: Array<{ key: string; label: string; entries: any[] }> = []
-  for (const f of visible.value) {
-    const [y, m, d] = String(f.watched).split('-')
+  for (const rec of visible.value) {
+    const [y, m, d] = String(rec.watched).split('-')
     if (!y || !m) continue
     const key = `${y}-${m}`
     let g = groups[groups.length - 1]
     if (!g || g.key !== key) { g = { key, label: `${MONTHS[Number(m) - 1] ?? m} ${y}`, entries: [] }; groups.push(g) }
-    g.entries.push({ ...f, day: Number(d) })
+    // merge title + record only for the rows actually being drawn
+    g.entries.push({ ...rec.f, watched: rec.watched, season: rec.season, episode: rec.episode, day: Number(d) })
   }
   return groups
 })
 
-const CHUNK = 60
-const limit = ref(CHUNK)
+// Switching tab/sort/filter re-renders the list from scratch, so the FIRST paint
+// is kept small — that's the part the eye waits on. The observer below then
+// extends the list 1000px before you reach the end, so scrolling still feels
+// continuous and you never actually see it stop.
+const FIRST_CHUNK = 24
+const CHUNK = 48
+const limit = ref(FIRST_CHUNK)
 const visible = computed(() => shown.value.slice(0, limit.value))
-watch([tab, view, sortBy, dir, filterType, search, focusId], () => { limit.value = CHUNK })
+watch([tab, view, sortBy, dir, filterType, search, focusId], () => { limit.value = FIRST_CHUNK })
 
 const sentinel = ref<HTMLElement | null>(null)
 let io: IntersectionObserver | undefined

@@ -133,26 +133,44 @@ export async function syncTrakt() {
     const imdbId = show?.ids?.imdb ?? null
     if (tmdbId && showIds.has(tmdbId)) return showIds.get(tmdbId)!
 
+    // Reuse the row we already have for this show rather than creating a second
+    // one. A show Farah logged on Letterboxd (e.g. Sharp Objects) is stored with
+    // its TMDB /tv id, so the id match finds it — including while it is still
+    // typed 'film', which is how Letterboxd exports every entry. Matching on
+    // tmdb_kind='tv' as well as type='series' keeps that case covered even if the
+    // row has not been enriched yet. The id/imdb matches are exact; the
+    // title+year match is the last resort and stays restricted to real series so
+    // a film can never be swallowed by a same-named show.
     const existing = await d.execute({
       sql: `SELECT id FROM titles
-            WHERE (tmdb_id IS NOT NULL AND tmdb_id = ? AND type = 'series')
+            WHERE (? IS NOT NULL AND tmdb_id = ? AND (type = 'series' OR tmdb_kind = 'tv'))
+               OR (? IS NOT NULL AND ? <> '' AND imdb_id = ? AND (type = 'series' OR tmdb_kind = 'tv'))
                OR (lower(title) = lower(?) AND (year = ? OR ? IS NULL) AND type = 'series')
+            ORDER BY (tmdb_id IS NOT NULL AND tmdb_id = ?) DESC, id ASC
             LIMIT 1`,
-      args: [tmdbId, String(show?.title ?? ''), show?.year ?? null, show?.year ?? null],
+      args: [
+        tmdbId, tmdbId,
+        imdbId, imdbId ?? '', imdbId,
+        String(show?.title ?? ''), show?.year ?? null, show?.year ?? null,
+        tmdbId,
+      ],
     })
 
     let id: number
     if (existing.rows.length) {
       id = Number(existing.rows[0].id)
+      // Trakt is telling us this is a show — promote the row so it stops being
+      // presented as a film, and record the endpoint its id belongs to.
       await d.execute({
-        sql: 'UPDATE titles SET tmdb_id = COALESCE(tmdb_id, ?), imdb_id = COALESCE(imdb_id, ?) WHERE id = ?',
+        sql: `UPDATE titles SET tmdb_id = COALESCE(tmdb_id, ?), imdb_id = COALESCE(imdb_id, ?),
+                type = 'series', tmdb_kind = COALESCE(tmdb_kind, 'tv') WHERE id = ?`,
         args: [tmdbId, imdbId, id],
       })
     } else if (show?.title) {
       const slug = String(show.title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
       const ins = await d.execute({
-        sql: `INSERT INTO titles (tmdb_id, imdb_id, slug, title, year, type, by, runtime, watched, watches)
-              VALUES (?,?,?,?,?,'series','','', '', 1)`,
+        sql: `INSERT INTO titles (tmdb_id, imdb_id, tmdb_kind, slug, title, year, type, by, runtime, watched, watches)
+              VALUES (?,?,'tv',?,?,?,'series','','', '', 1)`,
         args: [tmdbId, imdbId, slug, show.title, show.year ?? null],
       })
       id = Number(ins.lastInsertRowid)
@@ -193,18 +211,31 @@ export async function syncTrakt() {
     if (titleId && item.rating) ratingByTitle.set(titleId, item.rating)
   }
 
-  // 3) reconcile — only now do we mutate. Trakt is the source of truth for a
-  // SERIES' episode log (so its watches always match Trakt, no duplicates),
-  // regardless of `edited` — but hand-edited RATINGS are preserved. We never
-  // touch Letterboxd-matched titles (lb_uri set).
-  const SERIES = "type='series' AND (lb_uri IS NULL OR lb_uri='')"
-  await d.execute(`DELETE FROM watches WHERE title_id IN (SELECT id FROM titles WHERE ${SERIES})`)
+  // 3) reconcile — only now do we mutate. Trakt owns exactly the watch rows that
+  // carry a season/episode: every other importer (Letterboxd RSS, diary.csv, the
+  // admin's add-title) writes a date-only row with season NULL. Scoping the
+  // delete to season IS NOT NULL therefore lets ONE title row be shared by both
+  // sources — Trakt's episode plays are replaced wholesale each sync (so
+  // re-syncing can never pile up duplicates) while the Letterboxd diary entry
+  // for the same show survives untouched.
+  await d.execute(`DELETE FROM watches WHERE season IS NOT NULL
+                   AND title_id IN (SELECT id FROM titles WHERE type='series')`)
   for (const e of episodes) {
     await d.execute({
       sql: 'INSERT INTO watches (title_id, watched, season, episode) VALUES (?,?,?,?)',
       args: [e.titleId, e.watched, e.season, e.episode],
     })
   }
+
+  // Shared (Letterboxd-matched) shows are skipped by the rating pass below, so
+  // refresh their watch cache here or their episode counts would go stale.
+  for (const titleId of new Set(episodes.map((e) => e.titleId))) {
+    await syncWatchCache(titleId)
+  }
+
+  // Ratings/cleanup still only touch series Trakt is allowed to manage: a
+  // Letterboxd-matched show keeps the rating she gave it there.
+  const SERIES = "type='series' AND (lb_uri IS NULL OR lb_uri='')"
 
   // rebuild the cache + reconcile ratings for every series. Trakt is the source
   // of truth for a show's rating too: set it from Trakt, and CLEAR it when it's

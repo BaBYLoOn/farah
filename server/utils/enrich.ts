@@ -32,6 +32,24 @@ export function seriesRuntime(det: any): string {
   return fmtRuntime(det.last_episode_to_air?.runtime ?? det.next_episode_to_air?.runtime ?? null)
 }
 
+// Who a series is "by". TMDB's created_by is empty for most anime, so fall back
+// to the crew credit that actually names the author. Never falls back to a
+// director — a series is credited to its creator, not whoever directed it.
+export function seriesCreator(det: any): string {
+  const named = det.created_by?.[0]?.name
+  if (named) return String(named)
+
+  const crew: any[] = det.aggregate_credits?.crew ?? []
+  const jobsOf = (c: any): string[] =>
+    Array.isArray(c.jobs) ? c.jobs.map((j: any) => String(j.job ?? '')) : [String(c.job ?? '')]
+
+  for (const want of ['Original Series Creator', 'Original Story', 'Comic Book', 'Novel', 'Series Composition']) {
+    const hit = crew.find((c) => jobsOf(c).includes(want))
+    if (hit?.name) return String(hit.name)
+  }
+  return ''
+}
+
 // pull a remote poster down to ./uploads/poster-<titleId>.<ext> (Farah serves
 // /uploads from that dir); returns the local /uploads url, or null on failure
 export async function downloadPoster(url: string, titleId: number): Promise<string | null> {
@@ -98,15 +116,14 @@ export async function enrichTitles(limit = 60) {
       }
 
       const kind = resolvedTv ? 'tv' : 'movie'
+      const extra = resolvedTv ? 'credits,external_ids,aggregate_credits' : 'credits,external_ids'
       const det = await $fetch<any>(
-        `https://api.themoviedb.org/3/${kind}/${tmdbId}?api_key=${tmdbKey}&append_to_response=credits,external_ids`,
+        `https://api.themoviedb.org/3/${kind}/${tmdbId}?api_key=${tmdbKey}&append_to_response=${extra}`,
         { timeout: 15_000 },
       )
 
       const runtime = resolvedTv ? seriesRuntime(det) : fmtRuntime(det.runtime)
-      const director = resolvedTv
-        ? (det.created_by?.[0]?.name ?? '')
-        : (det.credits?.crew?.find((c: any) => c.job === 'Director')?.name ?? '')
+      const director = resolvedTv ? seriesCreator(det) : (det.credits?.crew?.find((c: any) => c.job === 'Director')?.name ?? '')
       const imdbId = det.external_ids?.imdb_id ?? det.imdb_id ?? null
 
       const remote = det.poster_path ? `https://image.tmdb.org/t/p/w500${det.poster_path}` : null
@@ -121,6 +138,7 @@ export async function enrichTitles(limit = 60) {
         sql: `UPDATE titles SET
                 tmdb_id = COALESCE(tmdb_id, ?),
                 tmdb_kind = ?,
+                type = ?,
                 imdb_id = COALESCE(imdb_id, ?),
                 runtime = CASE WHEN runtime = '' THEN ? ELSE runtime END,
                 by = CASE WHEN by = '' THEN ? ELSE by END,
@@ -129,7 +147,10 @@ export async function enrichTitles(limit = 60) {
                 end_year = ?,
                 ended = ?
               WHERE id = ?`,
-        args: [tmdbId, kind, imdbId, runtime, director, remote, posterLocal, run.endYear, run.ended, row.id],
+        // TMDB is the authority on what a title IS: something Letterboxd logged as
+        // a "film" but that only exists under /tv is a series, and must be shown as
+        // one (with its creator, not a director).
+        args: [tmdbId, kind, resolvedTv ? 'series' : 'film', imdbId, runtime, director, remote, posterLocal, run.endYear, run.ended, row.id],
       })
       enriched++
     } catch {

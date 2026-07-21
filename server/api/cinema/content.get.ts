@@ -8,7 +8,12 @@ export default defineEventHandler(async () => {
   const autosync = (await getSetting<{ paused: boolean }>('autosync')) ?? { paused: false }
 
   const titlesRes = await db().execute('SELECT * FROM titles ORDER BY watched DESC, id DESC')
-  const films = titlesRes.rows.map((r: any) => ({ ...rowToTitle(r), reviews: [] as any[] }))
+  // Only the fields the public page actually renders — slug/note/edited are
+  // admin-side concerns and just make the payload bigger to download and parse.
+  const films = titlesRes.rows.map((r: any) => {
+    const { slug, note, edited, ...t } = rowToTitle(r)
+    return { ...t, reviews: [] as any[] }
+  })
   const byId = new Map(films.map((t) => [t.id, t]))
 
   // attach PUBLIC reviews (private=0) only — newest first
