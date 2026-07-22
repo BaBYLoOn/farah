@@ -79,7 +79,7 @@ export async function enrichTitles(limit = 60) {
 
   const d = db()
   const rows = await d.execute({
-    sql: `SELECT id, tmdb_id, tmdb_kind, title, year, type, poster, poster_local, imdb_id FROM titles
+    sql: `SELECT id, tmdb_id, tmdb_kind, title, year, type, poster, poster_local, imdb_id, edited FROM titles
           WHERE ${NEEDY}
           ORDER BY watched DESC LIMIT ?`,
     args: [limit],
@@ -99,6 +99,10 @@ export async function enrichTitles(limit = 60) {
       // otherwise those titles never get a tmdb_id, and so never get a poster.
       let resolvedTv = row.tmdb_kind ? String(row.tmdb_kind) === 'tv' : isTv
       if (!tmdbId) {
+        // Never fuzzy-match a title the owner has hand-corrected: if they cleared
+        // its TMDB id on purpose (the real film simply isn't on TMDB), a name
+        // search would just re-attach the wrong one. Leave it as-is.
+        if (Number(row.edited) === 1) { continue }
         const search = async (kind: 'movie' | 'tv') => {
           const q = new URLSearchParams({ api_key: tmdbKey, query: String(row.title) })
           if (row.year) q.set(kind === 'tv' ? 'first_air_date_year' : 'year', String(row.year))

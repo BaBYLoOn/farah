@@ -61,6 +61,7 @@
               <span class="lrow-ratings">
                 <span v-if="e.imdb != null" class="r-imdb"><span class="star" aria-hidden="true">★</span>{{ e.imdb.toFixed(1) }}</span>
                 <span v-if="e.myRating != null" class="r-mine"><span class="star" aria-hidden="true">★</span>{{ e.myRating }}</span>
+                <CinemaWatchBadge :title="e" />
                 <button
                   v-if="e.reviews && e.reviews.length"
                   type="button"
@@ -108,8 +109,7 @@
           <span class="lrow-ratings">
             <span v-if="f.imdb != null" class="r-imdb"><span class="star" aria-hidden="true">★</span>{{ f.imdb.toFixed(1) }}</span>
             <span v-if="f.myRating != null" class="r-mine"><span class="star" aria-hidden="true">★</span>{{ f.myRating }}</span>
-            <span v-if="f.type === 'series' && playCount(f)" class="rewatch eps" :title="`${playCount(f)} episodes watched`"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>{{ playCount(f) }}</span>
-            <span v-else-if="playCount(f) > 1" class="rewatch" :title="`Watched ${playCount(f)} times`"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>{{ playCount(f) }}</span>
+            <CinemaWatchBadge :title="f" />
           </span>
           <span v-if="f.by" class="lrow-by"><span class="by-lbl">{{ f.type === 'series' ? 'Created by' : 'Directed by' }}</span> {{ f.by }}</span>
         </div>
@@ -135,6 +135,7 @@
         <span class="lrow-ratings film-ratings">
           <span v-if="f.imdb != null" class="r-imdb" title="IMDb">{{ f.imdb.toFixed(1) }}</span>
           <span v-if="f.myRating != null" class="r-mine" :title="`My rating ${f.myRating}/10`">{{ f.myRating }}</span>
+          <CinemaWatchBadge :title="f" />
         </span>
       </article>
     </div>
@@ -233,7 +234,6 @@ function onPosterErr(ev: Event, f: any) {
   const img = ev.target as HTMLImageElement & { dataset: DOMStringMap }
   if (f.posterLocal && !img.dataset.fellback) { img.dataset.fellback = '1'; img.src = f.posterLocal }
 }
-function playCount(f: any): number { return f.watches ?? 1 }
 function isFav(f: any): boolean { return props.admin && !!f.favorite }
 
 const filmsById = computed(() => {
