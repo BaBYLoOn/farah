@@ -261,7 +261,9 @@
 @keyframes cin-spin { to { transform: rotate(360deg); } }
 
 /* ---- grid view ---- */
-.archive { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.6rem, 1fr)); gap: 1.3rem 0.8rem; padding-bottom: 2rem; }
+/* 5.2rem min keeps 3 columns on a 320px phone while leaving the meta strip
+   under each poster enough room to stay on ONE line */
+.archive { display: grid; grid-template-columns: repeat(auto-fill, minmax(5.2rem, 1fr)); gap: 1.3rem 0.8rem; padding-bottom: 2rem; }
 @media (min-width: 620px) { .archive { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 1.6rem 1rem; } }
 .film { display: grid; gap: 0.45rem; text-decoration: none; align-content: start; content-visibility: auto; contain-intrinsic-size: auto 12rem; }
 .film-frame { display: block; aspect-ratio: 2 / 3; overflow: hidden; position: relative; border-radius: 4px; background: var(--c-bg2); border: 1px solid var(--c-line); box-shadow: 0 10px 22px rgba(0,0,0,0.5); transition: transform 0.5s var(--c-ease), border-color 0.5s var(--c-ease), box-shadow 0.5s var(--c-ease); }
@@ -271,7 +273,20 @@
 .no-poster .np-title { font-family: var(--c-body); font-weight: 600; font-size: 0.74rem; line-height: 1.2; color: var(--c-ink-dim); }
 .no-poster .np-year { font-family: var(--c-label); font-size: 0.48rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-accent-soft); }
 .grid-review-flag { position: absolute; bottom: 0.3rem; right: 0.35rem; color: var(--c-accent); font-size: 1rem; text-shadow: 0 1px 4px rgba(0,0,0,0.9); z-index: 2; }
-.film-ratings { justify-content: center; gap: 0.5rem; font-size: 0.66rem; flex-wrap: nowrap; }
+/* Meta strip under a grid poster: IMDb · my rating · episodes (series) or
+   rewatches (a film seen more than once). Always one line, and heavy enough to
+   read at arm's length — Cinzel 700, hairline separators, no letter-spacing. */
+.film-ratings {
+  justify-content: center; align-items: center;
+  gap: 0.3rem; flex-wrap: nowrap; white-space: nowrap; min-width: 0;
+  font-weight: 700; font-size: clamp(0.74rem, 2.8vw, 0.86rem);
+  letter-spacing: 0; line-height: 1;
+}
+.film-ratings > * + * { border-left: 1px solid var(--c-line); padding-left: 0.3rem; }
+.film-ratings .r-imdb { color: var(--c-accent); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); }
+.film-ratings .r-mine { color: var(--c-red); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); }
+.film-ratings .rewatch { color: var(--c-ink-dim); font-size: 0.94em; gap: 0.18rem; }
+.film-ratings .rewatch svg { width: 0.92em; height: 0.92em; stroke-width: 2.4; }
 
 .archive-empty { padding: 2.5rem 0; text-align: center; color: var(--c-mute); font-family: var(--c-label); letter-spacing: 0.1em; font-size: 0.8rem; }
 
