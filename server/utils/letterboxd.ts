@@ -4,6 +4,11 @@ import { downloadPoster } from './enrich'
 
 const UA = 'farahali.com/1.0'
 
+// Letterboxd serves its film-page markup (poster JSON-LD, data-tmdb-id) only to
+// a browser-shaped UA — the plain one above gets a stripped page.
+const BROWSER_UA =
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
 function tag(xml: string, name: string): string | null {
   const m = xml.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)</${name}>`))
   return m ? m[1].trim() : null
@@ -15,42 +20,97 @@ function decode(s: string): string {
     .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
 }
 
+// Does this id actually resolve on TMDB, and under which endpoint? Letterboxd's
+// declared type is a hint, not the truth (it calls Serial Experiments Lain a
+// movie), so try the declared kind first and then the other. Returns null when
+// the id resolves under neither — Letterboxd carries plenty of stale ids
+// pointing at TMDB entries that have since been deleted or merged.
+async function tmdbKindFor(id: number, declared: 'movie' | 'tv'): Promise<'movie' | 'tv' | null> {
+  const key = useRuntimeConfig().tmdbApiKey as string
+  if (!key) return declared // can't verify without a key; trust Letterboxd
+  for (const kind of [declared, declared === 'movie' ? 'tv' : 'movie'] as const) {
+    try {
+      const r = await $fetch<any>(`https://api.themoviedb.org/3/${kind}/${id}?api_key=${key}`, { timeout: 15_000 })
+      if (r?.id) return kind
+    } catch { /* 404 — try the other endpoint */ }
+  }
+  return null
+}
+
 // Resolve the EXACT TMDB id/type for titles carrying a Letterboxd URL (from the
-// diary.csv). Each Letterboxd film page exposes data-tmdb-id + data-tmdb-type,
-// replacing the fuzzy title+year guess. Incremental (only tmdb_id IS NULL), so
-// it's safe to auto-run after every sync. Leaves hand-edited titles alone.
-export async function resolveLetterboxdTmdb(limit = 40, afterId = 0) {
+// diary/ratings CSV). Each Letterboxd FILM page exposes data-tmdb-id +
+// data-tmdb-type, which beats the fuzzy title+year guess — that guess is what
+// put Kubrick's "2001: A Space Odyssey" behind Makoto Tezuka's "2001", "Horse
+// Girl" behind "Girl", and "The Call of the Wild" behind "The Call".
+//
+// `recheck` re-verifies titles that ALREADY have a tmdb_id instead of only
+// filling blanks. A wrong id is invisible to a blanks-only pass, so correcting
+// the fuzzy-matched back catalogue needs this. Hand-edited titles are never
+// touched either way.
+export async function resolveLetterboxdTmdb(limit = 40, afterId = 0, opts: { recheck?: boolean } = {}) {
   const d = db()
   const rows = await d.execute({
-    sql: `SELECT id, lb_uri FROM titles
-          WHERE lb_uri IS NOT NULL AND lb_uri != '' AND tmdb_id IS NULL AND id > ? AND edited = 0
+    sql: `SELECT id, tmdb_id, lb_uri FROM titles
+          WHERE lb_uri IS NOT NULL AND lb_uri != ''
+            ${opts.recheck ? '' : 'AND tmdb_id IS NULL'}
+            AND id > ? AND edited = 0
           ORDER BY id ASC LIMIT ?`,
     args: [afterId, limit],
   })
 
-  let matched = 0, corrected = 0, failed = 0, cursor = afterId
+  let matched = 0, corrected = 0, failed = 0, skipped = 0, cursor = afterId
+  const changes: Array<{ id: number; from: number | null; to: number }> = []
 
   for (const row of rows.rows as any[]) {
     cursor = Number(row.id)
     try {
-      const url = String(row.lb_uri).replace(/\/$/, '') + '/'
-      const html = await $fetch<string>(url, { responseType: 'text', headers: { 'User-Agent': UA }, timeout: 20_000 })
-      const idM = String(html).match(/data-tmdb-id="(\d+)"/)
-      const typeM = String(html).match(/data-tmdb-type="(movie|tv)"/)
+      const get = (u: string) =>
+        $fetch<string>(u, { responseType: 'text', headers: { 'User-Agent': BROWSER_UA }, timeout: 20_000 })
+
+      let html = String(await get(String(row.lb_uri).replace(/\/$/, '') + '/'))
+      let idM = html.match(/data-tmdb-id="(\d+)"/)
+
+      // A stored lb_uri is often a DIARY ENTRY page, which carries no tmdb id —
+      // follow it through to the film page it links to.
+      if (!idM) {
+        const slug = html.match(/\/film\/[a-z0-9][a-z0-9-]*\//)?.[0]
+        if (slug) {
+          html = String(await get(`https://letterboxd.com${slug}`))
+          idM = html.match(/data-tmdb-id="(\d+)"/)
+        }
+      }
+
+      const typeM = html.match(/data-tmdb-type="(movie|tv)"/)
       const tmdbId = idM ? Number(idM[1]) : null
       if (!tmdbId) { failed++; continue }
-      const type = typeM?.[1] === 'tv' ? 'series' : 'film'
 
-      const cur = await d.execute({ sql: 'SELECT tmdb_id FROM titles WHERE id = ?', args: [row.id] })
-      const had = (cur.rows[0] as any)?.tmdb_id
-      const wrong = had != null && Number(had) !== tmdbId
-      if (wrong) corrected++
+      const had = row.tmdb_id == null ? null : Number(row.tmdb_id)
+
+      // Letterboxd is authoritative about WHICH film this is, but not about the
+      // id still being live — some of its ids point at TMDB entries that were
+      // deleted or merged. Never trade a working id for one that resolves
+      // nowhere: that is what turned Serial Experiments Lain from the real TV
+      // series into a dead movie id.
+      const kind = await tmdbKindFor(tmdbId, typeM?.[1] === 'tv' ? 'tv' : 'movie')
+      if (!kind) {
+        if (had != null) { skipped++; continue }  // keep what we have
+        failed++; continue                        // nothing to keep — leave blank
+      }
+
+      const isTv = kind === 'tv'
+      const wrong = had != null && had !== tmdbId
+      if (wrong) { corrected++; changes.push({ id: Number(row.id), from: had, to: tmdbId }) }
+
+      // When the id was wrong, everything derived from it is wrong too — blank it
+      // so the enrich pass refetches against the right film. Her OWN data (title,
+      // year, rating, reviews, watch dates, favourite) is never touched.
+      const reset = wrong
+        ? `, imdb_id = NULL, imdb = NULL, poster = NULL, poster_local = NULL,
+             by = '', runtime = '', end_year = NULL, ended = NULL`
+        : ''
       await d.execute({
-        sql: `UPDATE titles SET tmdb_id = ?, type = ?, tmdb_kind = ?,
-                imdb_id = CASE WHEN ? THEN NULL ELSE imdb_id END,
-                poster = CASE WHEN ? THEN NULL ELSE poster END
-              WHERE id = ?`,
-        args: [tmdbId, type, typeM?.[1] === 'tv' ? 'tv' : 'movie', wrong ? 1 : 0, wrong ? 1 : 0, row.id],
+        sql: `UPDATE titles SET tmdb_id = ?, type = ?, tmdb_kind = ?${reset} WHERE id = ?`,
+        args: [tmdbId, isTv ? 'series' : 'film', isTv ? 'tv' : 'movie', row.id],
       })
       matched++
     } catch {
@@ -59,12 +119,8 @@ export async function resolveLetterboxdTmdb(limit = 40, afterId = 0) {
     await new Promise((r) => setTimeout(r, 1200))
   }
 
-  return { matched, corrected, failed, cursor, done: rows.rows.length < limit }
+  return { matched, corrected, failed, skipped, cursor, changes, done: rows.rows.length < limit }
 }
-
-// Letterboxd sends its film pages' artwork only to a browser-shaped UA.
-const BROWSER_UA =
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
 // Pull the poster Letterboxd shows for a film. Its JSON-LD carries the artwork
 // URL; the size is encoded in the filename, so ask for 600x900 rather than the

@@ -1,5 +1,5 @@
 <template>
-  <section class="cinema-scope archive-section" :class="{ 'is-admin': admin }" aria-label="My cinema" dir="ltr">
+  <section ref="root" class="cinema-scope archive-section" :class="{ 'is-admin': admin }" aria-label="My cinema" dir="ltr">
     <div class="archive-controls">
       <!-- Watched / Diary -->
       <div class="tabs2" role="group" aria-label="Archive view">
@@ -42,19 +42,13 @@
       </div>
     </div>
 
-    <!-- focus: jumped here from a diary row to read a title's reviews -->
-    <div v-if="tab === 'watched' && focusId && focusTitle" class="focus-bar">
-      <button type="button" @click="focusId = null">‹ All films</button>
-      <span>Reviews for <b>{{ focusTitle.title }}</b></span>
-    </div>
-
     <!-- DIARY -->
     <div v-if="tab === 'diary'">
       <div v-if="diaryLoading && !diaryRecords" class="diary-loading"><span class="spinner small" aria-hidden="true"></span> Loading the diary…</div>
       <div v-else-if="shown.length" class="diary">
         <template v-for="g in diaryGroups" :key="g.key">
           <h3 class="diary-month">{{ g.label }}</h3>
-          <article v-for="(e, i) in g.entries" :key="`${e.id}-${g.key}-${e.day}-${i}`" class="diary-row">
+          <article v-for="e in g.entries" :key="e.rowKey" class="diary-row" :class="{ 'is-open': isOpen(e.rowKey) }">
             <span class="diary-day">{{ e.day }}</span>
             <a class="thumb-link" v-bind="imdbAttrs(e)">
               <img v-poster v-if="posterOf(e)" class="diary-thumb" :src="posterOf(e)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, e)" />
@@ -67,11 +61,31 @@
               <span class="lrow-ratings">
                 <span v-if="e.imdb != null" class="r-imdb"><span class="star" aria-hidden="true">★</span>{{ e.imdb.toFixed(1) }}</span>
                 <span v-if="e.myRating != null" class="r-mine"><span class="star" aria-hidden="true">★</span>{{ e.myRating }}</span>
-                <button v-if="e.reviews && e.reviews.length" type="button" class="review-jump" :title="`Read ${e.title}'s review${e.reviews.length > 1 ? 's' : ''}`" @click="jumpToReviews(e)">
+                <button
+                  v-if="e.reviews && e.reviews.length"
+                  type="button"
+                  class="review-jump"
+                  :class="{ open: isOpen(e.rowKey) }"
+                  :aria-expanded="isOpen(e.rowKey)"
+                  :title="`${isOpen(e.rowKey) ? 'Hide' : 'Read'} ${e.title}'s review${e.reviews.length > 1 ? 's' : ''}`"
+                  @click="toggleReview(e.rowKey)"
+                >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="M9 9h1M9 13h6M9 17h6"/></svg>
-                  <span>review</span>
+                  <span>{{ e.reviews.length > 1 ? `${e.reviews.length} reviews` : 'review' }}</span>
+                  <span class="rj-chev" aria-hidden="true">▾</span>
                 </button>
               </span>
+            </div>
+
+            <!-- expanded in place: the title's details + every review it has -->
+            <div v-if="isOpen(e.rowKey)" class="diary-open">
+              <p v-if="e.by" class="diary-open-by">
+                <span class="by-lbl">{{ e.type === 'series' ? 'Created by' : 'Directed by' }}</span> {{ e.by }}
+              </p>
+              <p v-for="rv in e.reviews" :key="rv.id" class="title-review">
+                <span v-if="rv.reviewed" class="tr-date">{{ fmtDate(rv.reviewed) }}</span>
+                <span class="tr-text" dir="auto">{{ rv.text }}</span>
+              </p>
             </div>
           </article>
         </template>
@@ -81,7 +95,7 @@
 
     <!-- WATCHED — list -->
     <div v-else-if="view === 'list' && shown.length" class="list">
-      <article v-for="f in visible" :key="f.id" :id="`t-${f.id}`" class="lrow" :class="{ 'is-fav': isFav(f), focused: focusId === f.id }">
+      <article v-for="f in visible" :key="f.id" :id="`t-${f.id}`" class="lrow" :class="{ 'is-fav': isFav(f) }">
         <a class="thumb-link" v-bind="imdbAttrs(f)">
           <img v-poster v-if="posterOf(f)" class="thumb" :src="posterOf(f)" alt="" loading="lazy" decoding="async" @error="onPosterErr($event, f)" />
           <div v-else class="thumb-fallback" aria-hidden="true">{{ f.title.charAt(0) }}</div>
@@ -163,15 +177,15 @@ const view = ref<'list' | 'cards'>('list')
 const sortBy = ref<SortKey>('watched')
 const dir = ref<'asc' | 'desc'>('desc')
 const search = ref('')
-const focusId = ref<number | null>(null)
 
-const focusTitle = computed(() => (focusId.value == null ? null : props.films.find((f) => f.id === focusId.value) ?? null))
-
-function jumpToReviews(e: any) {
-  focusId.value = e.id
-  filterType.value = 'all'
-  tab.value = 'watched'
-  if (import.meta.client) nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }))
+// Diary rows whose reviews are expanded in place. Keyed per ROW, not per title,
+// so a film watched twice expands only the entry you actually pressed.
+const openRows = ref(new Set<string>())
+const isOpen = (key: string) => openRows.value.has(key)
+function toggleReview(key: string) {
+  const next = new Set(openRows.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  openRows.value = next
 }
 
 function matchSearch(f: any): boolean {
@@ -274,11 +288,6 @@ const shown = computed(() => {
     }
     return out
   }
-  // focus mode: only the title we jumped to (to read its reviews)
-  if (focusId.value != null) {
-    const f = filmsById.value.get(focusId.value)
-    return f ? [f] : []
-  }
   const list = props.films.filter((f: any) => {
     if (!matchSearch(f)) return false
     if (filterType.value === 'review') return hasReview(f)
@@ -306,8 +315,13 @@ const diaryGroups = computed(() => {
     const key = `${y}-${m}`
     let g = groups[groups.length - 1]
     if (!g || g.key !== key) { g = { key, label: `${MONTHS[Number(m) - 1] ?? m} ${y}`, entries: [] }; groups.push(g) }
-    // merge title + record only for the rows actually being drawn
-    g.entries.push({ ...rec.f, watched: rec.watched, season: rec.season, episode: rec.episode, day: Number(d) })
+    // merge title + record only for the rows actually being drawn. rowKey
+    // identifies this exact watch (a rewatch is its own row, and expands alone).
+    g.entries.push({
+      ...rec.f,
+      watched: rec.watched, season: rec.season, episode: rec.episode, day: Number(d),
+      rowKey: `${rec.f.id}-${rec.watched}-${rec.season ?? ''}-${rec.episode ?? ''}-${g.entries.length}`,
+    })
   }
   return groups
 })
@@ -320,14 +334,32 @@ const FIRST_CHUNK = 24
 const CHUNK = 48
 const limit = ref(FIRST_CHUNK)
 const visible = computed(() => shown.value.slice(0, limit.value))
-watch([tab, view, sortBy, dir, filterType, search, focusId], () => { limit.value = FIRST_CHUNK })
+watch([tab, view, sortBy, dir, filterType, search], () => { limit.value = FIRST_CHUNK })
 
 const sentinel = ref<HTMLElement | null>(null)
+const root = ref<HTMLElement | null>(null)
 let io: IntersectionObserver | undefined
+
+// Watched and Diary are separate lists, so they must not share a scroll
+// position — switching while deep in one would otherwise drop you into the
+// middle of the other. Rewind to the top of the archive (NOT the top of the
+// page: that would yank you back past the favourites carousels), and only when
+// you're actually below it, so browsing the carousels stays undisturbed.
+function rewindToList() {
+  if (!import.meta.client) return
+  nextTick(() => {
+    const el = root.value
+    if (!el) return
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+    const deck = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--deck-top')) || 3.7
+    const target = el.getBoundingClientRect().top + window.scrollY - deck * rem
+    if (window.scrollY > target) window.scrollTo({ top: target, behavior: 'auto' })
+  })
+}
 
 watch(tab, (t) => {
   if (t === 'diary' && !props.diaryRecords) emit('load-diary')
-  if (t === 'diary') focusId.value = null
+  rewindToList()
 })
 
 onMounted(() => {

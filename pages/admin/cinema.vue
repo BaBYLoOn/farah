@@ -37,6 +37,20 @@
         </div>
         <label class="ccheck"><input type="checkbox" :checked="autosyncPaused" @change="setAutosyncPaused(($event.target as HTMLInputElement).checked)" /> Pause automatic syncing (while I upload)</label>
 
+        <div class="crow verify-row">
+          <button class="cbtn ghost" :disabled="verifying" @click="verifyAgainstLetterboxd">
+            {{ verifying ? `Checking… ${verifyDone} of ${verifyTotal || '?'}` : 'Re-check every title against Letterboxd' }}
+          </button>
+          <span class="cmsg verify-hint">
+            Matching by name + year alone can pick the wrong film — it put Kubrick's
+            <i>2001: A Space Odyssey</i> behind Makoto Tezuka's <i>2001</i>. This walks every
+            title's own Letterboxd link and corrects the ones that point at the wrong film.
+            It's slow (a second or two each, to be polite to Letterboxd) — leave the page open.
+            Your ratings, reviews and watch dates are never touched.
+          </span>
+          <span v-if="verifyMsg" class="cmsg" :class="{ err: verifyErr, ok: !verifyErr && !verifying }">{{ verifyMsg }}</span>
+        </div>
+
         <div class="crow trakt-row">
           <span class="trakt-label">Trakt — TV shows</span>
 
@@ -276,6 +290,31 @@ async function refreshPosters() {
     if (!syncErr.value) syncMsg.value = `Refreshed ${total} posters from TMDB`; await reload()
   } catch (e: any) { syncErr.value = true; syncMsg.value = e?.statusMessage ?? 'Refresh failed' } finally { refreshing.value = false; refreshMsg.value = 'Refreshing…' }
 }
+// Walk every title's Letterboxd link and correct the ones a name+year guess got
+// wrong. Batched so progress is visible and one bad page can't stall the lot.
+const verifying = ref(false); const verifyMsg = ref(''); const verifyErr = ref(false)
+const verifyDone = ref(0); const verifyTotal = ref(0)
+async function verifyAgainstLetterboxd() {
+  verifying.value = true; verifyErr.value = false; verifyMsg.value = ''
+  verifyDone.value = 0
+  verifyTotal.value = titles.value.length
+  let after = 0, corrected = 0, checked = 0, kept = 0
+  try {
+    for (let i = 0; i < 200; i++) {
+      const r = await $fetch<any>('/api/admin/lb-match', { method: 'POST', body: { after, limit: 25, recheck: true } })
+      checked += r.matched; corrected += r.corrected; kept += r.skipped ?? 0
+      after = r.cursor; verifyDone.value = checked + kept
+      if (r.done) break
+    }
+    verifyMsg.value = corrected
+      ? `Corrected ${corrected} title${corrected === 1 ? '' : 's'} that pointed at the wrong film — details are refetching now.`
+      : `Checked ${checked} titles — every one already pointed at the right film.`
+    await processNow()
+    await reload()
+  } catch (e: any) { verifyErr.value = true; verifyMsg.value = e?.statusMessage ?? 'The Letterboxd check failed' }
+  finally { verifying.value = false }
+}
+
 async function importDiary(e: Event) {
   const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return
   syncMsg.value = 'Importing diary…'; syncErr.value = false
@@ -430,6 +469,9 @@ async function traktSync() {
 .cadmin-note .hl, .hl { color: var(--c-accent); }
 .cadmin-note code { font-family: ui-monospace, monospace; font-size: 0.85em; color: var(--c-ink); }
 .crow { display: flex; gap: 0.7rem; flex-wrap: wrap; align-items: flex-end; }
+.verify-row { border-top: 1px solid var(--c-line-soft); padding-top: 0.9rem; align-items: flex-start; }
+.verify-hint { flex-basis: 100%; line-height: 1.6; }
+.verify-hint i { font-style: italic; color: var(--c-ink); }
 .trakt-row { border-top: 1px solid var(--c-line-soft); padding-top: 0.9rem; align-items: center; }
 .trakt-label { font-family: var(--c-label); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-accent); }
 .trakt-hint { flex-basis: 100%; line-height: 1.65; }

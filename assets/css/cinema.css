@@ -175,14 +175,6 @@
 .viewtoggle2 button:hover { color: var(--c-ink); }
 .viewtoggle2 svg { width: 1rem; height: 1rem; }
 
-.focus-bar {
-  display: flex; align-items: center; gap: 0.8rem; padding: 0.6rem 0; margin-bottom: 0.4rem;
-  border-bottom: 1px solid var(--c-line); font-family: var(--c-label); font-size: 0.72rem;
-  letter-spacing: 0.06em; color: var(--c-ink-dim);
-}
-.focus-bar button { background: none; border: none; color: var(--c-accent); cursor: pointer; font: inherit; }
-.focus-bar b { color: var(--c-ink); }
-
 /* ---- list view ---- */
 .list { border-top: 1px solid var(--c-line-soft); }
 .lrow {
@@ -216,7 +208,7 @@
 .rewatch { display: inline-flex; align-items: center; gap: 0.28rem; color: var(--c-ink-dim); white-space: nowrap; font-size: 0.9em; }
 .rewatch svg { width: 0.95em; height: 0.95em; }
 
-/* review flag button on a diary row → jumps to the title's reviews in Watched */
+/* review button on a diary row → expands that entry's reviews in place */
 .review-jump {
   display: inline-flex; align-items: center; gap: 0.3rem; background: none; border: 1px solid var(--c-accent-soft);
   border-radius: 999px; padding: 0.12rem 0.5rem 0.12rem 0.4rem; color: var(--c-accent); cursor: pointer;
@@ -225,6 +217,9 @@
 }
 .review-jump:hover { background: rgba(205,191,158,0.12); color: var(--c-ink); }
 .review-jump svg { width: 0.85rem; height: 0.85rem; }
+.review-jump.open { background: rgba(205,191,158,0.14); color: var(--c-ink); border-color: var(--c-accent); }
+.rj-chev { display: inline-block; font-size: 0.8em; line-height: 1; transition: transform 0.3s var(--c-ease); }
+.review-jump.open .rj-chev { transform: rotate(180deg); }
 
 /* dated reviews shown under a Watched title */
 .title-reviews { grid-column: 1 / -1; display: grid; gap: 0.6rem; margin: 0.5rem 0 0.2rem; padding-left: 0.2rem; }
@@ -242,6 +237,21 @@
   padding: 0.8rem 0; border-bottom: 1px solid var(--c-line-soft);
   content-visibility: auto; contain-intrinsic-size: auto 6.1rem;
 }
+/* an expanded row is taller than the reserved size and always on screen —
+   skipping its layout would fight the expansion */
+.diary-row.is-open { content-visibility: visible; }
+/* the expanded panel spans the full row, under the day/poster/details columns */
+.diary-open {
+  grid-column: 1 / -1; display: grid; gap: 0.5rem;
+  margin: 0.15rem 0 0.2rem; padding-top: 0.6rem; border-top: 1px dashed var(--c-line);
+  animation: diary-open 0.28s var(--c-ease);
+}
+@keyframes diary-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.diary-open-by {
+  margin: 0; font-family: var(--c-label); font-size: 0.62rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--c-ink-dim);
+}
+.diary-open-by .by-lbl { color: var(--c-mute); }
 .diary-day { display: grid; place-items: center; width: 2.1rem; height: 2.1rem; font-family: var(--c-label); font-size: 0.9rem; color: var(--c-ink-dim); border: 1px solid var(--c-line); border-radius: 5px; }
 .diary-thumb { width: 3rem; aspect-ratio: 2 / 3; object-fit: cover; border: 1px solid var(--c-line); border-radius: 2px; }
 .diary-thumb-fallback { display: grid; place-items: center; background: var(--c-bg2); font-family: var(--c-display); color: var(--c-mute); }
