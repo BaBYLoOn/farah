@@ -15,7 +15,7 @@ export interface SiteContent {
 }
 
 // Icon names the hero/footer can render (must match the SVG maps in those components).
-export const ICON_NAMES = ['essays', 'weblog', 'letterboxd', 'pinterest', 'soundcloud', 'instagram', 'link']
+export const ICON_NAMES = ['essays', 'weblog', 'letterboxd', 'pinterest', 'soundcloud', 'instagram', 'telegram', 'link']
 
 export const DEFAULT_SITE: SiteContent = {
   hero: {

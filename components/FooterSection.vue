@@ -46,6 +46,7 @@ const icons: Record<string, string> = {
   pinterest:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><circle cx="12" cy="11" r="7.5"/><path d="M10.6 7.6 L10.6 14.4"/><path d="M10.6 7.6 L13 7.6 C14.4 7.6 15.2 8.6 15.2 9.8 C15.2 11 14.4 11.9 13 11.9 L10.6 11.9"/><path d="M10.6 14.4 L9.2 20.5"/></svg>`,
   soundcloud: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M4.5 6 C7 4 11 4 13.5 6 C15.5 5.4 18 6.4 18.5 8.4" opacity="0.55"/><path d="M3 14 L3 10"/><path d="M6 17 L6 9"/><path d="M9 19 L9 7"/><path d="M12 17 L12 9"/><path d="M15 15 L15 11"/><path d="M18 17 L18 9"/><path d="M21 14 L21 10"/></svg>`,
   instagram:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="0.85" fill="currentColor"/></svg>`,
+  telegram:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M21 4.5 L3 10.5 L7.45 12.2 L9.5 19 L12.4 16 L17 19.5 Z"/><path d="M7.45 12.2 L18 6.7"/></svg>`,
 }
 const iconFor = (key: string) => icons[key] ?? icons.link
 
