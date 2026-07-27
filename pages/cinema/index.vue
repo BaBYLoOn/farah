@@ -19,7 +19,6 @@
           <span class="fav-more-in">See all<span class="fav-more-arrow" aria-hidden="true">›</span></span>
         </NuxtLink>
       </div>
-      <p v-if="favFilms.length > 4" class="swipe-hint" aria-hidden="true"><span>‹</span> swipe for more <span>›</span></p>
     </section>
 
     <section v-if="favSeries.length" class="favs" aria-label="Favorite series" v-reveal>
@@ -36,7 +35,6 @@
           <span class="fav-more-in">See all<span class="fav-more-arrow" aria-hidden="true">›</span></span>
         </NuxtLink>
       </div>
-      <p v-if="favSeries.length > 4" class="swipe-hint" aria-hidden="true"><span>‹</span> swipe for more <span>›</span></p>
     </section>
 
     <CinemaArchive
